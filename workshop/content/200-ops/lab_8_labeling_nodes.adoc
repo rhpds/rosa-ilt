@@ -12,9 +12,9 @@ Therefore we need to label the Machine pool itself.
 . Just like the last section, let's use the default machine pool to add our label.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa edit machinepool -c rosa-${GUID} --labels tier=frontend Default
+rosa edit machinepool -c ${CLUSTER_NAME} --labels tier=frontend Default
 ----
 +
 .Sample Output
@@ -26,7 +26,7 @@ I: Updated machine pool 'Default' on cluster 'rosa-6n4s8'
 . Now, let's verify the nodes are properly labeled.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get nodes --selector='tier=frontend' -o name
 ----
@@ -50,7 +50,7 @@ This should force our app to only our labeled nodes.
 . First, let's create a namespace (also known as a project in OpenShift).
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc new-project nodeselector-ex
 ----
@@ -72,7 +72,7 @@ to build a new example application in Ruby. Or use kubectl to deploy a simple Ku
 . Next, let's deploy our application and associated resources that will target our labeled nodes.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cat << EOF | oc apply -f -
 ---
@@ -118,7 +118,7 @@ deployment.apps/nodeselector-app created
 . Now, let's validate that the application has been deployed to one of the labeled nodes.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n nodeselector-ex get pod -l app=nodeselector-app -o json \
   | jq -r .items[0].spec.nodeName
@@ -132,7 +132,7 @@ ip-10-0-146-31.us-east-2.compute.internal
 
 . Double check the name of the node to compare it to the output above to ensure the node selector worked to put the pod on the correct node
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get nodes --selector='tier=frontend' -o name
 ----
@@ -148,7 +148,7 @@ node/ip-10-0-252-142.us-east-2.compute.internal
 
 . Next create a `service` using the `oc expose` command
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc expose deployment nodeselector-app
 ----
@@ -161,7 +161,7 @@ service/nodeselector-app exposed
 
 . Expose the newly created `service` with a `route`
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc create route edge --service=nodeselector-app  --insecure-policy=Redirect
 ----
@@ -174,7 +174,7 @@ route.route.openshift.io/nodeselector-app created
 
 . Fetch the URL for the newly created `route`
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get routes/nodeselector-app -o json | jq -r '.spec.host'
 ----

@@ -1,22 +1,22 @@
 ---
 modules:
   index:
-    name: Home
-    exit_sign: Continue
+    name: Introduction
+    exit_sign: Environment
   100-setup/1-environment:
     name: Environment
-    exit_sign: Continue
+    exit_sign: Deploy ROSA cluster
   100-setup/2-cluster-creation:
     name: Deploy ROSA cluster
-    exit_sign: Continue
-# 100-setup/2-cluster-creation-hcp:
-#   name: Deploy ROSA cluster (HCP)
-#   exit_sign: Continue
-  100-setup/3-access-cluster:
-    name: Create an admin user
-    exit_sign: Continue
-  200-ops/lab_4_configure_idp:
-    name: Configure Authentication
+    exit_sign: Deploy ROSA cluster (HCP)
+  100-setup/2-cluster-creation-hcp:
+    name: Deploy ROSA cluster (HCP)
+    exit_sign: Create admin user
+  100-setup/3-create-admin-user:
+    name: Create admin user
+    exit_sign: Configure IDP (Red Hat SSO)
+  200-ops/lab_4_configure_idp_keycloak:
+    name: Configure IDP (Red Hat SSO)
     exit_sign: Continue
   200-ops/lab_5_cluster_upgrades:
     name: Cluster Upgrades

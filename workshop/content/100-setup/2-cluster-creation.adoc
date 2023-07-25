@@ -35,7 +35,7 @@ Make sure that the service role for ELB already exists, otherwise the cluster de
 
 . Run the following to check for the role and create it if it is missing.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws iam get-role --role-name "AWSServiceRoleForElasticLoadBalancing" || aws iam create-service-linked-role --aws-service-name "elasticloadbalancing.amazonaws.com"
 ----
@@ -79,7 +79,7 @@ If this is the *first time* you are deploying ROSA in this account and have *not
 
 . Run the following command to create the account-wide roles:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa create account-roles --mode auto --yes
 ----
@@ -93,28 +93,44 @@ I: AWS credentials are valid!
 I: Validating AWS quota...
 I: AWS quota ok. If cluster installation fails, validate actual AWS resource usage against https://docs.openshift.com/rosa/rosa_getting_started/rosa-required-aws-service-quotas.html
 I: Verifying whether OpenShift command-line tool is available...
-I: Current OpenShift Client Version: 4.12.12
+I: Current OpenShift Client Version: 4.13.5
 I: Creating account roles
-I: Creating roles using 'arn:aws:iam::948540395585:user/wkulhane@redhat.com-4fgbq'
-I: Created role 'ManagedOpenShift-Installer-Role' with ARN 'arn:aws:iam::948540395585:role/ManagedOpenShift-Installer-Role'
-I: Created role 'ManagedOpenShift-ControlPlane-Role' with ARN 'arn:aws:iam::948540395585:role/ManagedOpenShift-ControlPlane-Role'
-I: Created role 'ManagedOpenShift-Worker-Role' with ARN 'arn:aws:iam::948540395585:role/ManagedOpenShift-Worker-Role'
-I: Created role 'ManagedOpenShift-Support-Role' with ARN 'arn:aws:iam::948540395585:role/ManagedOpenShift-Support-Role'
+I: Creating roles using 'arn:aws:iam::281359555390:user/wkulhane@redhat.com-dhqc7'
+I: Created role 'ManagedOpenShift-Installer-Role' with ARN 'arn:aws:iam::281359555390:role/ManagedOpenShift-Installer-Role'
+I: Created role 'ManagedOpenShift-ControlPlane-Role' with ARN 'arn:aws:iam::281359555390:role/ManagedOpenShift-ControlPlane-Role'
+I: Created role 'ManagedOpenShift-Worker-Role' with ARN 'arn:aws:iam::281359555390:role/ManagedOpenShift-Worker-Role'
+I: Created role 'ManagedOpenShift-Support-Role' with ARN 'arn:aws:iam::281359555390:role/ManagedOpenShift-Support-Role'
+I: To create an OIDC Config, run the following command:
+	rosa create oidc-config
 I: To create a cluster with these roles, run the following command:
-rosa create cluster --sts
+	rosa create cluster --sts
 ----
 
 === Create the cluster
 
-. Run the following command to create a cluster with all the default options except for the cluster version.
+. Set up some variables and save them in your `.bashrc` for future use.
 +
 Note that for the cluster name you are using `rosa-${GUID}` - the environment variable `GUID` has a unique identifier for your environment that will separate yours from any other ROSA cluster.
 +
-[source,sh,role=execute]
+[source,sh]
+----
+export REGION=us-east-2
+export OCP_VERSION=4.13.3
+export CLUSTER_NAME=rosa-${GUID}
+
+echo "export REGION=${REGION}" >>${HOME}/.bashrc
+echo "export OCP_VERSION=${OCP_VERSION}" >>${HOME}/.bashrc
+echo "export CLUSTER_NAME=${CLUSTER_NAME}" >>${HOME}/.bashrc
+----
+
+. Run the following command to create a cluster with all the default options except for the cluster version.
++
+[source,sh,role=copy]
 ----
 rosa create cluster \
-  --cluster-name rosa-${GUID} \
-  --version 4.13.0 \
+  --cluster-name ${CLUSTER_NAME} \
+  --version ${OCP_VERSION} \
+  --region ${REGION} \
   --sts \
   --mode auto \
   --yes
@@ -178,14 +194,14 @@ The default settings are as follows:
 
 . You can run the following command to check the detailed status of the cluster:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa describe cluster --cluster rosa-${GUID}
+rosa describe cluster --cluster ${CLUSTER_NAME}
 ----
 
 . You can also run the following for an abridged view of the status:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa list clusters
 ----
@@ -197,7 +213,7 @@ ID                                NAME        STATE
 22uvcd13s0d1p8jt6589b22cp1m3u9j3  rosa-4fgbq  installing
 ----
 +
-You should notice the state change from "`waiting`" to "`installing`" to "ready".
+You should notice the state change from "`pending`" to "`installing`" to "ready".
 +
 This will take about 40 minutes to run.
 
@@ -205,9 +221,9 @@ This will take about 40 minutes to run.
 
 . You can follow along the installation by watching your cluster installation logs:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa logs install -c rosa-${GUID} --watch
+rosa logs install -c ${CLUSTER_NAME} --watch
 ----
 
 . Once you see the following out put in the installation log your cluster has finished the installation and is ready to use:
@@ -228,7 +244,7 @@ Sometimes it can happen that the connection to your bastion VM drops. In that ca
 
 . Verify that the cluster is now ready:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa list clusters
 ----
@@ -244,9 +260,9 @@ ID                                NAME        STATE
 
 . To get the console URL run:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa describe cluster -c rosa-${GUID} | grep Console
+rosa describe cluster -c ${CLUSTER_NAME} | grep Console
 ----
 +
 .Sample Output
@@ -256,3 +272,14 @@ Console URL:                https://console-openshift-console.%rosa_subdomain_ba
 ----
 
 The cluster has now been successfully deployed.
+
+== Obtain the API URL
+
+. To get get (and save) the API URL run:
++
+[source,sh]
+----
+export API_URL=$(rosa describe cluster -c ${CLUSTER_NAME}|grep "API URL" | awk -c '{print $3}')
+
+echo "export API_URL=${API_URL}" >> ${HOME}/.bashrc
+----

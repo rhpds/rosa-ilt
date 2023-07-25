@@ -18,7 +18,7 @@ Answer `yes` when asked if to accept the host key.
 The password for the user %rosa_bastion_user_name% is `%rosa_user_password%`
 ====
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 ssh %rosa_bastion_user_name%@bastion.%rosa_subdomain_base%
 ----
@@ -43,7 +43,7 @@ You will be using the `rosa`, `aws` and `oc` command line tools throughout this 
 
 . Verify that the `rosa` command line tool is installed (note that your version may be a more recent version than the output shown below):
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa version
 ----
@@ -51,13 +51,13 @@ rosa version
 .Sample Output
 [source,texinfo]
 ----
-1.2.22
+1.2.23
 Your ROSA CLI is up to date.
 ----
 
 . Verify that the `aws` command line tool is installed:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws --version
 ----
@@ -65,12 +65,12 @@ aws --version
 .Sample Output
 [source,text,options=nowrap]
 ----
-aws-cli/2.11.23 Python/3.11.3 Linux/4.18.0-305.88.1.el8_4.x86_64 exe/x86_64.rhel.8 prompt/off
+aws-cli/2.13.3 Python/3.11.4 Linux/4.18.0-305.88.1.el8_4.x86_64 exe/x86_64.rhel.8 prompt/off
 ----
 
 . Verify that the `aws` command line tool is configured correctly:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws sts get-caller-identity
 ----
@@ -87,7 +87,7 @@ aws sts get-caller-identity
 
 . Verify that the `oc` CLI is installed correctly
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa verify openshift-client
 ----
@@ -96,12 +96,12 @@ rosa verify openshift-client
 [source,texinfo,options=nowrap]
 ----
 I: Verifying whether OpenShift command-line tool is available...
-I: Current OpenShift Client Version: 4.13.0
+I: Current OpenShift Client Version: 4.13.5
 ----
 
 . Rosa login
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa login
 ----
@@ -121,7 +121,7 @@ In this environment your token has been preconfigured for you.
 
 . Run rosa whoami to verify your credentials:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa whoami
 ----
@@ -146,7 +146,7 @@ OCM Organization Name:        Red Hat, Inc.
 
 . Verify that your AWS account has enough quota in the region you will be deploying your cluster to.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa verify quota
 ----

@@ -13,9 +13,9 @@ You will need to set up autoscaling for each MachinePool in the cluster separate
 
 . To identify the machine pool IDs in a cluster, enter the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa list machinepools --cluster rosa-${GUID}
+rosa list machinepools --cluster ${CLUSTER_NAME}
 ----
 +
 .Sample Output
@@ -29,9 +29,9 @@ The *ID* of the MachinePool that you want to add autoscaling to is `Default`.
 
 . To enable autoscaling on a machine pool, enter the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa edit machinepool --cluster rosa-${GUID} Default --enable-autoscaling --min-replicas=2 --max-replicas=4
+rosa edit machinepool --cluster ${CLUSTER_NAME} Default --enable-autoscaling --min-replicas=2 --max-replicas=4
 ----
 +
 .Sample Output
@@ -43,7 +43,7 @@ I: Updated machine pool 'Default' on cluster 'rosa-6n4s8'
 . Next, let's check to see that our managed machine autoscalers have been created.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n openshift-machine-api get machineautoscaler
 ----
@@ -58,7 +58,7 @@ rosa-6n4s8-7hbhw-worker-us-east-2a   MachineSet   rosa-6n4s8-7hbhw-worker-us-eas
 . And finally, let's check to see that our cluster autoscaler has been created.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get clusterautoscaler
 ----
@@ -79,7 +79,7 @@ This should force the cluster to scale to handle the load.
 . First, let's create a namespace (also known as a project in OpenShift).
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc new-project autoscale-ex
 ----
@@ -101,7 +101,7 @@ to build a new example application in Ruby. Or use kubectl to deploy a simple Ku
 . Next, let's deploy our job that will exhaust the cluster's resources and cause it to scale more worker nodes.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cat << EOF | oc apply -f -
 ---
@@ -141,7 +141,7 @@ job.batch/maxscale created
 
 . After a few seconds, run the following to see what pods have been created.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n autoscale-ex get pods
 ----
@@ -165,7 +165,7 @@ This should trigger the cluster autoscaler to create more machines using the Mac
 . Let's check to see if our MachineSet automatically scaled.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n openshift-machine-api get machinesets
 ----
@@ -183,7 +183,7 @@ This shows that the cluster autoscaler is working on scaling multiple MachineSet
 . Now let's watch the cluster autoscaler create and delete machines as necessary.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 watch oc -n openshift-machine-api get machines \
   -l machine.openshift.io/cluster-api-machine-role=worker
@@ -206,7 +206,7 @@ Watch will refresh the output of a command every second. Hit CTRL and c on your 
 
 . Once the machines are running stop the watch and re-run the command to display the pods for the job. You should see that more pods are now running. If you still see some pods in Pending state that is normal because even 4 worker nodes may not be enough to handle the node - but you limited the autoscaler to 4 worker nodes.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n autoscale-ex get pods
 ----

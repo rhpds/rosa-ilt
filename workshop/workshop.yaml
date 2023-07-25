@@ -1,13 +1,13 @@
 ---
-name: MOBB ROSA Workshop
+name: ROSA ILT
 modules:
   activate:
   - index
   - 100-setup/1-environment
   - 100-setup/2-cluster-creation
-# - 100-setup/2-cluster-creation-hcp
-  - 100-setup/3-access-cluster
-  - 200-ops/lab_4_configure_idp
+  - 100-setup/2-cluster-creation-hcp
+  - 100-setup/3-create-admin-user
+  - 200-ops/lab_4_configure_idp_keycloak
   - 200-ops/lab_5_cluster_upgrades
   - 200-ops/lab_6_managing_worker_nodes
   - 200-ops/lab_7_autoscaling

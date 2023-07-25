@@ -14,7 +14,7 @@ If you'd like to learn more, see the https://docs.openshift.com/rosa/rosa_cluste
 
 . First, let's examine the MachineSets that are deployed in our cluster:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n openshift-machine-api get machinesets
 ----
@@ -32,9 +32,9 @@ You will see two MachineSets, one for worker nodes and one for infra nodes.
 . It is best to manage the worker nodes using ROSA MachinePools. Let's see what MachinePools already exist in our cluster.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa list machinepools -c rosa-${GUID}
+rosa list machinepools -c ${CLUSTER_NAME}
 ----
 +
 .Sample Output
@@ -49,7 +49,7 @@ Note that there is only a MachinePool for worker nodes.
 . Now, let's take a look at the machines inside of the ROSA cluster that have been created according to the instructions provided by the above MachinePools.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n openshift-machine-api get machine
 ----
@@ -72,9 +72,9 @@ For this workshop, we've deployed your ROSA cluster with seven total machines (t
 . Now that we know that we have two worker nodes, let's create a MachinePool to add a new worker node using the ROSA CLI.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa create machinepool -c rosa-${GUID} --replicas 1 --name workshop --instance-type m5.xlarge
+rosa create machinepool -c ${CLUSTER_NAME} --replicas 1 --name workshop --instance-type m5.xlarge
 ----
 +
 .Sample Output
@@ -90,9 +90,9 @@ This command adds a single m5.xlarge instance to the first AWS availability zone
 . Now, let's scale up our selected MachinePool from one to two machines.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa update machinepool -c rosa-${GUID} --replicas 2 workshop
+rosa update machinepool -c ${CLUSTER_NAME} --replicas 2 workshop
 ----
 +
 .Sample Output
@@ -104,7 +104,7 @@ I: Updated machine pool 'workshop' on cluster 'rosa-6n4s8'
 . Now that we've scaled the MachineSet to two machines, we can see that the machine is already being created.
 First, let's quickly check the output of the same command we ran in step 1:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n openshift-machine-api get machinesets
 ----
@@ -122,7 +122,7 @@ rosa-6n4s8-7hbhw-workshop-us-east-2a   2         2                             7
 
 . We can also run the same command we ran in step 2 to see the machine being provisioned:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n openshift-machine-api get machine
 ----
@@ -147,15 +147,15 @@ rosa-6n4s8-7hbhw-workshop-us-east-2a-pxnvd   Provisioned   m5.xlarge    us-east-
 . We don't actually need these extra worker nodes so let's scale the cluster back down to a total of 3 worker nodes by scaling down the "Workshop" Machine Pool.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa update machinepool -c rosa-${GUID} --replicas 1 workshop
+rosa update machinepool -c ${CLUSTER_NAME} --replicas 1 workshop
 ----
 
 . Now that we've scaled the MachinePool (and therefore the MachineSet) back down to one machine, we can see the change reflected in the cluster almost immediately.
 Let's quickly check the output of the same command we ran before:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n openshift-machine-api get machinesets
 ----
@@ -172,9 +172,9 @@ rosa-6n4s8-7hbhw-workshop-us-east-2a   1         1         1       1           6
 . Now let's scale the cluster back down to a total of 2 worker nodes by deleting the "Workshop" Machine Pool.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa delete machinepool -c rosa-${GUID} workshop --yes
+rosa delete machinepool -c ${CLUSTER_NAME} workshop --yes
 ----
 +
 .Sample Output

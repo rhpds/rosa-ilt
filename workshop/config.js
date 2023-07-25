@@ -16,7 +16,6 @@ function flatten_vars(vars_object) {
   return ret
 }
 
-
 function initialize(workshop) {
     workshop.load_workshop();
 
@@ -40,7 +39,6 @@ function initialize(workshop) {
         }
     } catch(err) {}
 }
-
 
 exports.default = initialize;
 

@@ -1,0 +1,703 @@
+= Dynamic Certificates for ROSA Custom Domain
+
+There may be situations when you prefer not to use wild-card certificates. This ROSA guide talks about certificate management with cert-manager and letsencrypt, to dynamically issue certificates to routes created on a custom domain that's hosted on AWS Route53.
+
+== Set up environment
+
+. Find your public AWS HostedZones:
++
+[source,sh,role=copy]
+----
+aws route53 list-hosted-zones --output=json | jq '.HostedZones[] | select(.Config.PrivateZone == false)'
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+  "Id": "/hostedzone/Z02691132KEODF2F6E887",
+  "Name": "82bk.p1.openshiftapps.com.",
+  "CallerReference": "4b445d3d-177a-4d41-91df-afad3f4e4073",
+  "Config": {
+    "PrivateZone": false
+  },
+  "ResourceRecordSetCount": 4
+}
+{
+  "Id": "/hostedzone/Z01849073R81WOHBEDGNL",
+  "Name": "szrxx.sandbox2309.opentlc.com.",
+  "CallerReference": "befc7192-af9c-40ee-a0d8-598c991b529c-2023-07-25 16:19:26.857",
+  "Config": {
+    "Comment": "Created by Ansible Agnostic Deployer",
+    "PrivateZone": false
+  },
+  "ResourceRecordSetCount": 3
+}
+{
+  "Id": "/hostedzone/Z01937683S2A5BG3S73WK",
+  "Name": "sandbox2309.opentlc.com.",
+  "CallerReference": "sandbox2309.opentlc.com.-1662186994.251595",
+  "Config": {
+    "Comment": "",
+    "PrivateZone": false
+  },
+  "ResourceRecordSetCount": 3
+}
+----
++
+[NOTE]
+====
+This command should print three hosted zones. You want to use the ID for the Hosted Zone where the name looks like `xxxxx.sandboxYYYY.opentlc.com`. In the example above that would be `szrxx.sandbox2309.opentlc.com` and therefore your HOSTED_ZONE_ID should be set to `Z01849073R81WOHBEDGNL` in the next command.
+And the *DOMAIN* should be set to `szrxx.sandbox2309.opentlc.com`.
+====
+
+. Export few environment variables (using values from above for the HOSTED_ZONE_ID and DOMAIN)
++
+[source,sh,role=copy]
+----
+export OIDC_PROVIDER=$(oc get authentication.config.openshift.io cluster -o json \
+| jq -r .spec.serviceAccountIssuer| sed -e "s/^https:\/\///")
+
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+export AWS_PAGER=""
+
+export LETSENCRYPT_EMAIL=youremail@work.com
+
+export HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
+export DOMAIN=szrxx.sandbox2309.opentlc.com
+
+export CERT_DIR=${HOME}/certs
+mkdir -p ${CERT_DIR}
+----
+
+== Prepare AWS Account
+
+In order to make changes to the AWS Route53 Hosted Zone to add/remove DNS TXT challenge records by the cert-manager pod, we first need to create an IAM role with specific policy permissions & a trust relationship to allow access to the pod.
+
+. My Custom Domain Hosted Zone is in the same account as the ROSA cluster. If these are in different accounts, few additional steps for Cross Account Access will be required.
++
+Prepare an IAM Policy file:
+// WK: Narrow to just the desired hosted zone??
++
+[source,sh,role=copy]
+----
+cat <<EOF > ${CERT_DIR}/cert-manager-r53-policy.json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "route53:GetChange",
+      "Resource": "arn:aws:route53:::change/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets"
+      ],
+      "Resource": "arn:aws:route53:::hostedzone/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "route53:ListHostedZonesByName",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+----
+
+. Create the IAM Policy using the above created file. This creates a named policy for the cluster, you could use a generic policy for multiple clusters to keep things simpler.
++
+[source,sh,role=copy]
+----
+POLICY=$(aws iam create-policy --policy-name "${CLUSTER_NAME}-cert-manager-r53-policy" \
+  --policy-document file://${CERT_DIR}/cert-manager-r53-policy.json \
+  --query 'Policy.Arn' --output text)
+
+echo ${POLICY}
+----
++
+.Sample Output
+[source,texinfo]
+----
+arn:aws:iam::870651848115:policy/rosa-szrxx-cert-manager-r53-policy
+----
+
+. Create a Trust Policy
++
+[source,sh,role=copy]
+----
+cat <<EOF > ${CERT_DIR}/trust-policy.json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER}"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "${OIDC_PROVIDER}:sub": [
+            "system:serviceaccount:cert-manager:cert-manager"
+          ]
+        }
+      }
+    }
+  ]
+}
+EOF
+----
+
+. Create an IAM Role for the cert-manager Operator, with the above trust policy.
++
+[source,sh,role=copy]
+----
+ROLE=$(aws iam create-role \
+  --role-name "${CLUSTER_NAME}-cert-manager-operator" \
+  --assume-role-policy-document file://${CERT_DIR}/trust-policy.json \
+  --query "Role.Arn" --output text)
+
+echo ${ROLE}
+----
++
+.Sample Output
+[source,texinfo]
+----
+arn:aws:iam::870651848115:role/rosa-szrxx-cert-manager-operator
+----
+
+. Attach the permissions policy to the role
++
+[source,sh,role=copy]
+----
+aws iam attach-role-policy \
+    --role-name "${CLUSTER_NAME}-cert-manager-operator" \
+    --policy-arn $POLICY
+----
+
+== Set up Red Hat cert-manager operator
+
+. Create a the `cert-manager-opeator` namespace in the ROSA cluster.
++
+[source,sh,role=copy]
+----
+oc create namespace cert-manager-operator
+----
+
+. Install the Red Hat cert-manager operator
++
+[source,sh,role=copy]
+----
+cat <<EOF | oc apply -f -
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-cert-manager-operator
+  namespace: cert-manager-operator
+spec:
+  targetNamespaces:
+  - cert-manager-operator
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-cert-manager-operator
+  namespace: cert-manager-operator
+spec:
+  channel: stable-v1
+  installPlanApproval: Automatic
+  name: openshift-cert-manager-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+EOF
+----
++
+.Sample Output
+[source,texinfo]
+----
+operatorgroup.operators.coreos.com/openshift-cert-manager-operator created
+subscription.operators.coreos.com/openshift-cert-manager-operator created
+----
+
+. Wait until the operator pod is running:
++
+[source,sh,role=copy]
+----
+oc get pod -n cert-manager-operator
+----
++
+.Sample Output
+[source,texinfo]
+----
+NAME                                                        READY   STATUS    RESTARTS   AGE
+cert-manager-operator-controller-manager-579bcb76f8-rg77t   2/2     Running   0          41s
+----
+
+. Annotate the ServiceAccount. This is to enable the AWS SDK client code running within the cert-manager pod to interact with AWS STS service for temporary tokens, by assuming the IAM Role that was created in an earlier step. This is referred to as IRSA.
++
+[source,sh,role=copy]
+----
+oc annotate serviceaccount cert-manager -n cert-manager eks.amazonaws.com/role-arn=${ROLE}
+----
++
+Normally, after ServiceAccount annotations, a restart of the pod is required. However, the next step will automatically cause a restart of the pod.
+
+. There is an issue with Domain Name resolution when running OpenShift on AWS - cert manager checks of the domain is valid before it requests a certificate from Let's Encrypt. But since it only sees the internal cluster domains it will always fail the check. Therefore you need to point it to an external nameserver.
++
+[source,sh,role=copy]
+----
+cat <<EOF | oc apply -f -
+---
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+spec:
+  logLevel: Normal
+  managementState: Managed
+  observedConfig: null
+  operatorLogLevel: Normal
+  controllerConfig:
+    overrideArgs:
+    - "--dns01-recursive-nameservers=1.1.1.1:53"
+    - "--dns01-recursive-nameservers-only"
+  unsupportedConfigOverrides: null
+EOF
+----
+
+== Create the ClusterIssuer and the Certficate
+
+=== Configure ClusterIssuer
+
+. Create a `ClusterIssuer` to use Let's Encrypt
++
+[source,sh,role=copy]
+----
+envsubst  <<EOF | oc apply -f -
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencryptissuer
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ${LETSENCRYPT_EMAIL}
+    # This key doesn't exist, cert-manager creates it
+    privateKeySecretRef:
+      name: prod-letsencrypt-issuer-account-key
+    solvers:
+    - dns01:
+        route53:
+          hostedZoneID: ${HOSTED_ZONE_ID}
+          region: ${REGION}
+          secretAccessKeySecretRef:
+            name: ''
+EOF
+----
++
+.Sample Output
+[source,texinfo]
+----
+clusterissuer.cert-manager.io/letsencryptissuer created
+----
+
+. Describe the `ClusterIssuer` to confirm it is ready.
++
+[source,sh,role=copy]
+----
+oc get clusterissuer letsencryptissuer -o json | jq .status
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+  "acme": {
+    "lastRegisteredEmail": "wkulhane@redhat.com",
+    "uri": "https://acme-v02.api.letsencrypt.org/acme/acct/1226230427"
+  },
+  "conditions": [
+    {
+      "lastTransitionTime": "2023-07-26T13:33:28Z",
+      "message": "The ACME account was registered with the ACME server",
+      "observedGeneration": 1,
+      "reason": "ACMEAccountRegistered",
+      "status": "True",
+      "type": "Ready"
+    }
+  ]
+}
+----
++
+You should see an output that mentions that the issuer is Registered/Ready. Note this can take a few minutes.
+
+. Create the certificate, which will later be used by the Custom Domain.
+
+* The example used a SAN certificate here to show how SAN certificates could be created, which will be useful for clusters intended to run only a fixed set of applications. However, this is optional; a single subject/domain certificate works too *
+
+. Configure the certificate
++
+[source,sh,role=copy]
+----
+envsubst  <<EOF | oc apply -f -
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: customdomain-cert
+  namespace: cert-manager
+spec:
+  secretName: custom-domain-certificate-tls
+  issuerRef:
+      name: letsencryptissuer
+      kind: ClusterIssuer
+  commonName: "x.apps.${DOMAIN}"
+  dnsNames:
+  - "x.apps.${DOMAIN}"
+  - "y.apps.${DOMAIN}"
+  - "z.apps.${DOMAIN}"
+EOF
+----
+
+. View the certificate status. It can take up to 5 minutes for the Certificate to show as `Ready` status. If it takes too long, the `oc describe` command will mention issues if any. You can also tail the logs of the `cert-manager-xxxxxxxx-xxxx` pod in the `cert-manager` namespace to check for errors.
++
+[source,sh,role=copy]
+----
+oc get certificate customdomain-cert -n cert-manager
+----
++
+.Sample Output
+[source,texinfo]
+----
+NAME                READY   SECRET                          AGE
+customdomain-cert   True    custom-domain-certificate-tls   2m8s
+----
+
+== Create the Custom Domain, which will be used to access your applications.
+
+. Create the Custom Domain
++
+[source,sh,role=copy]
+----
+envsubst  <<EOF | oc apply -f -
+---
+apiVersion: managed.openshift.io/v1alpha1
+kind: CustomDomain
+metadata:
+  name: appdomain
+spec:
+  domain: x.apps.${DOMAIN}
+  certificate:
+    name: custom-domain-certificate-tls
+    namespace: cert-manager
+  scope: External
+EOF
+----
++
+.Sample Output
+[source,texinfo]
+----
+customdomain.managed.openshift.io/appdomain created
+----
+
+. View the status of the custom domain
++
+[source,sh,role=copy]
+----
+oc get customdomain appdomain -n cert-manager
+----
++
+.Sample Output
+[source,texinfo]
+----
+NAME        ENDPOINT                                                DOMAIN                                 STATUS
+appdomain   tcoana.appdomain.rosa-szrxx.82bk.p1.openshiftapps.com   x.apps.szrxx.sandbox2309.opentlc.com   Ready
+----
++
+It will take 2-3 minutes for the custom domain to change from `NotReady` to `Ready` status. When ready, an endpoint also will be visible in the output of the above command, as shown above.
+
+== Custom Domains
+
+Next, we need to add a DNS record in my Custom Domain Route53 Hosted Zone to CNAME the the wildcard applications domain to the above obtained endpoint, as shown below.
+
+. Find the custom domain endpoint
++
+[source,sh,role=copy]
+----
+CUSTOM_DOMAIN_ENDPOINT=$(oc get customdomain appdomain -n cert-manager -o json | jq -r .status.endpoint)
+
+echo $CUSTOM_DOMAIN_ENDPOINT
+----
++
+.Sample Output
+[source,texinfo]
+----
+tcoana.appdomain.rosa-szrxx.82bk.p1.openshiftapps.com
+----
+
+. Create the Route53 CNAME record.
++
+[source,sh,role=copy]
+----
+cat <<EOF > ${CERT_DIR}/add_cname_record.json
+{
+"Comment":"Add apps CNAME to Custom Domain Endpoint",
+"Changes":[{
+    "Action":"CREATE",
+    "ResourceRecordSet":{
+      "Name": "*.apps.${DOMAIN}",
+    "Type":"CNAME",
+    "TTL":30,
+    "ResourceRecords":[{
+      "Value": "${CUSTOM_DOMAIN_ENDPOINT}"
+    }]
+  }
+}]
+}
+EOF
+
+aws route53 change-resource-record-sets --hosted-zone-id ${HOSTED_ZONE_ID} --change-batch file://${CERT_DIR}/add_cname_record.json
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "ChangeInfo": {
+        "Id": "/change/C065165618HRI13T0A6TQ",
+        "Status": "PENDING",
+        "SubmittedAt": "2023-07-26T15:08:04.368000+00:00",
+        "Comment": "Add apps CNAME to Custom Domain Endpoint"
+    }
+}
+----
++
+[NOTE]
+====
+The wild card CNAMEing avoids the need to create a new record for every new application. The certificate that each of these applications use will NOT be a wildcard certificate.
+====
+// Check Resource Record Sets:
+// aws route53 list-resource-record-sets --hosted-zone-id ${HOSTED_ZONE_ID}
+
+. Check that DNS is set up correctly
++
+[source,sh,role=copy]
+----
+dig x.apps.${DOMAIN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+; <<>> DiG 9.16.23-RH <<>> x.apps.szrxx.sandbox2309.opentlc.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 14025
+;; flags: qr rd ra; QUERY: 1, ANSWER: 3, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;x.apps.szrxx.sandbox2309.opentlc.com.	IN A
+
+;; ANSWER SECTION:
+x.apps.szrxx.sandbox2309.opentlc.com.	30 IN CNAME tcoana.appdomain.rosa-szrxx.82bk.p1.openshiftapps.com.
+tcoana.appdomain.rosa-szrxx.82bk.p1.openshiftapps.com. 60 IN A 3.122.7.126
+tcoana.appdomain.rosa-szrxx.82bk.p1.openshiftapps.com. 60 IN A 3.120.1.101
+
+;; Query time: 7 msec
+;; SERVER: 192.168.0.2#53(192.168.0.2)
+;; WHEN: Wed Jul 26 15:59:16 UTC 2023
+;; MSG SIZE  rcvd: 162
+----
+
+== Test the custom domain
+ 
+=== Create a test an application
+
+. Create a test application in a new namespace.
++
+[source,sh,role=copy]
+----
+oc new-project testapp
+
+oc new-app --docker-image=docker.io/openshift/hello-openshift -n testapp
+----
+
+. Expose the test application Service using one of the domain names that you created (`x.apps.${DOMAIN}`).
++
+[source,sh,role=copy]
+----
+oc create route edge --service=hello-openshift testroute --hostname x.apps.${DOMAIN} -n testapp
+----
++
+.Sample Output
+[source,texinfo]
+----
+route.route.openshift.io/testroute created
+----
+
+. Remind yourself of the hostname that you just created and navigate to that hostname in a browser of your choice. Not only should the application be available at the custom domain name but it should also have a proper certificate.
++
+[source,sh,role=copy]
+----
+echo https://x.apps.${DOMAIN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+https://x.apps.szrxx.sandbox2309.opentlc.com
+----
+
+. You can also test using `curl`:
++
+[source,sh]
+----
+curl -vv https://x.apps.${DOMAIN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+*   Trying 3.120.1.101:443...
+* Connected to x.apps.szrxx.sandbox2309.opentlc.com (3.120.1.101) port 443 (#0)
+
+[...Output omitted...]
+
+* Server certificate:
+*  subject: CN=x.apps.szrxx.sandbox2309.opentlc.com
+*  start date: Jul 26 14:52:13 2023 GMT
+*  expire date: Oct 24 14:52:12 2023 GMT
+*  subjectAltName: host "x.apps.szrxx.sandbox2309.opentlc.com" matched cert's "x.apps.szrxx.sandbox2309.opentlc.com"
+*  issuer: C=US; O=Let's Encrypt; CN=R3
+*  SSL certificate verify ok.
+* TLSv1.2 (OUT), TLS header, Unknown (23):
+
+[...Output omitted...]
+
+Hello OpenShift!
+* Connection #0 to host x.apps.szrxx.sandbox2309.opentlc.com left intact
+----
+
+. Delete the test application
++
+[source,sh,role=copy]
+----
+oc delete project testapp
+----
+
+At this stage, you will be able to expose cluster applications on any of the listed DNS names that were specified in the previously created `Certificate`. But what if you have many more applications that will need to be securely exposed too. Well, one approach is to keep updating the `Certificate` resource with additional SAN names as more applications prepare to get onboarded, and this `Certificate` update which will trigger an update to the Custom Domain to honor the newly added SAN names. Another approach is to dynamically issue a `Certificate` to every new Route.
+
+Read on to find the details about this latter approach.
+
+== Dynamic Certificates for Custom Domain Routes.
+
+=== Create OpenShift resources required for issuing Dynamic Certificates to Routes.
+
+This step will create a new deployment (and hence a pod) that will watch out for specifically annotated routes in the cluster, and if the issuer-kind and issuer-name annotations are found in a new route, it will request the Issuer (ClusterIssuer in our case) for a new Certificate that's unique to this route and which will honor the hostname that was specified while creating the route.
+
+. Install the OpenShift Routes support for cert manager:
++
+[source,sh,role=copy]
+----
+oc apply -f https://github.com/cert-manager/openshift-routes/releases/latest/download/cert-manager-openshift-routes.yaml -n cert-manager
+----
++
+.Sample Output
+[source,texinfo]
+----
+clusterrole.rbac.authorization.k8s.io/cert-manager-openshift-routes created
+serviceaccount/cert-manager-openshift-routes created
+clusterrolebinding.rbac.authorization.k8s.io/cert-manager-openshift-routes created
+deployment.apps/cert-manager-openshift-routes created
+----
++
+Additonal OpenShift resources such as a ClusterRole (with permissions to watch and update the routes across the cluster), a ServiceAccount (with these permissions, that will be used to run this newly created pod) and a ClusterRoleBinding to bind these two resources, will be created in this step too.
+
+. View the status of the new pod. Check if all the pods are running successfully and that the events do not mention any errors.
++
+[source,sh,role=copy]
+----
+oc get pod -n cert-manager
+----
++
+.Sample Output
+[source,texinfo]
+----
+NAME                                             READY   STATUS    RESTARTS   AGE
+cert-manager-5f54dc87bd-ws844                    1/1     Running   0          40m
+cert-manager-cainjector-7756df6bd8-w4d9h         1/1     Running   0          43m
+cert-manager-openshift-routes-5bfbc6fb88-2xp47   1/1     Running   0          53s
+cert-manager-webhook-7bbdb775dc-k2cw4            1/1     Running   0          43m
+----
+
+=== Test an application
+
+. Create a test application in a new namespace.
++
+[source,sh,role=copy]
+----
+oc new-project dynroute
+oc new-app --docker-image=docker.io/openshift/hello-openshift -n dynroute
+----
+
+. Expose the test application Service. Let's create a Route to expose the application from outside the cluster, and annotate the Route to give it a new Certificate.
++
+[source,sh,role=copy]
+----
+oc create route edge --service=hello-openshift testroute --hostname hello.apps.${DOMAIN} -n dynroute
+
+oc annotate route testroute -n dynroute cert-manager.io/issuer-kind=ClusterIssuer cert-manager.io/issuer-name=letsencryptissuer
+----
++
+.Sample Output
+[source,texinfo]
+----
+route.route.openshift.io/testroute created
+route.route.openshift.io/testroute annotated
+----
+    
+. It will take a 2-3 minutes for the certificate to be created. The renewal of the certificate will automatically be managed by the cert-manager components as it approaches expiry.
+
+. Access the application Route. Do a curl test (or any http client of your preference) to confirm there are no certificate related errors.
++
+[source,sh,role=copy]
+----
+curl -vv https://hello.apps.${DOMAIN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+*   Trying 3.120.1.101:443...
+* Connected to x.apps.szrxx.sandbox2309.opentlc.com (3.120.1.101) port 443 (#0)
+
+[...Output omitted...]
+
+* Server certificate:
+*  subject: CN=hello.apps.szrxx.sandbox2309.opentlc.com
+*  start date: Jul 26 15:06:15 2023 GMT
+*  expire date: Oct 24 15:06:14 2023 GMT
+*  subjectAltName: host "hello.apps.szrxx.sandbox2309.opentlc.com" matched cert's "hello.apps.szrxx.sandbox2309.opentlc.com"
+*  issuer: C=US; O=Let's Encrypt; CN=R3
+*  SSL certificate verify ok.
+[...Output omitted...]
+
+Hello OpenShift!
+* Connection #0 to host hello.myapps.szrxx.sandbox2309.opentlc.com left intact
+----
+
+. Delete the test application
++
+[source,sh]
+----
+oc delete project dynroute
+----

@@ -13,14 +13,14 @@ Now in the real world you would obviously use an already existing keycloak envir
 
 . Set up a few variables
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export SSO_NAMESPACE=keycloak
 ----
 
 . Create a project where your operator will be installed to:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 oc new-project ${SSO_NAMESPACE}
 ----
@@ -41,7 +41,7 @@ to build a new example application in Ruby. Or use kubectl to deploy a simple Ku
 
 . To install, first create an Operator Group for the operator:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat << EOF | oc apply -f -
 ---
@@ -64,7 +64,7 @@ operatorgroup.operators.coreos.com/keycloak-operator created
 
 . Next, install the subscription:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat << EOF | oc apply -f -
 ---
@@ -90,7 +90,7 @@ subscription.operators.coreos.com/rhsso-operator created
 
 . Wait until the operator is running (repeat until it is):
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 oc get pod -n ${SSO_NAMESPACE}
 ----
@@ -108,7 +108,7 @@ Now you can deploy the Red Hat SSO server:
 
 . Create the `Keycloak` object:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat <<EOF | oc apply -f -
 ---
@@ -134,7 +134,7 @@ keycloak.keycloak.org/keycloak created
 
 . Wait until Keycloak is fully deployed (repeat until the output looks like the example output):
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 oc get pod -n ${SSO_NAMESPACE}
 ----
@@ -151,7 +151,7 @@ rhsso-operator-74d7955b8c-77jnb        1/1     Running   0          7m25s
 
 . Validate that in fact the Keycloak server is ready:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 oc get keycloak keycloak -o json | jq .status.ready
 ----
@@ -170,7 +170,7 @@ This step sets environment variables based on the installation that are needed i
 ====
 
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export SSO_ADMIN_CONSOLE=https://$(oc -n ${SSO_NAMESPACE} get route keycloak -o json | jq -r '.status.ingress[0].host')
 
@@ -186,7 +186,7 @@ export CALLBACK_URL_BASE=https://oauth-openshift.apps.${CLUSTER_DOMAIN}/oauth2ca
 
 . Create Realm:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat <<EOF | oc apply -f -
 ---
@@ -218,7 +218,7 @@ keycloakrealm.keycloak.org/rosa created
 
 . Create Client:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat <<EOF | oc apply -f -
 ---
@@ -273,7 +273,7 @@ keycloakclient.keycloak.org/rosa created
 
 . Create a user which will become the ROSA admin:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat <<EOF | oc apply -f -
 ---
@@ -309,7 +309,7 @@ keycloakuser.keycloak.org/rosa-admin created
 
 . Create a user which will become the just a regular developer user:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat <<EOF | oc apply -f -
 ---
@@ -347,7 +347,7 @@ keycloakuser.keycloak.org/rosa-developer created
 
 . Retrieve the client secret:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export SSO_CLIENT_SECRET=$(oc get secret keycloak-client-secret-rosa -o json | jq -r '.data.CLIENT_SECRET' | base64 -d)
 ----
@@ -514,7 +514,7 @@ clusterrole.rbac.authorization.k8s.io/cluster-admin added: "rosa-admin"
 .. Click *Display Token*
 .. Copy the command under *Login with this token* to your terminal and log in:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 oc login --token=sha256~SFmUwJmNuH9GY2sO47aRggBJsfb2VYskD_kb0VizoQc --server=https://api.rosa-s8j4w.g5r0.p1.openshiftapps.com:6443
 ----

@@ -112,10 +112,10 @@ I: To create a cluster with these roles, run the following command:
 +
 Note that for the cluster name you are using `rosa-${GUID}` - the environment variable `GUID` has a unique identifier for your environment that will separate yours from any other ROSA cluster.
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export REGION=us-east-2
-export OCP_VERSION=4.13.3
+export OCP_VERSION=4.13.4
 export CLUSTER_NAME=rosa-${GUID}
 
 echo "export REGION=${REGION}" >>${HOME}/.bashrc
@@ -277,7 +277,7 @@ The cluster has now been successfully deployed.
 
 . To get get (and save) the API URL run:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export API_URL=$(rosa describe cluster -c ${CLUSTER_NAME}|grep "API URL" | awk -c '{print $3}')
 

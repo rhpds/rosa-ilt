@@ -3,10 +3,10 @@ name: ROSA ILT
 modules:
   activate:
   - index
-  - 100-setup/1-environment
-  - 100-setup/2-cluster-creation
-  - 100-setup/2-cluster-creation-hcp
-  - 100-setup/3-create-admin-user
+  - 100-setup/lab_1_environment
+  - 100-setup/lab_2a_cluster_creation
+  - 100-setup/lab_2b_cluster_creation_hcp
+  - 100-setup/lab_3_create_admin_user
   - 200-ops/lab_4_configure_idp_keycloak
   - 200-ops/lab_5_cluster_upgrades
   - 200-ops/lab_6_managing_worker_nodes
@@ -23,3 +23,9 @@ modules:
   - 400-service-mesh/lab_17_service_mesh_deploy_control_plane
   - 400-service-mesh/lab_18_service_mesh_deploy_app
   - 400-service-mesh/lab_19_service_mesh_observe
+  - 100-setup/lab_x_cluster_creation_private_link
+  - 200-ops/lab_x_configure_efs_csi_driver
+  - 200-ops/lab_x_configure_rosa_ecr
+  - 200-ops/lab-x-custom_domains_for_apps
+  - 200-ops/lab_x_oadp
+  - 300-apps/lab_x_aws_secrets_manager

@@ -1,0 +1,899 @@
+= Creating a ROSA cluster with Private Link enabled (custom VPC) and STS
+
+This is a combination of the private-link and sts setup documents to show the full picture
+
+.Architecture diagram showing privatelink with public subnet
+image::../media/private-link.png[width=100%]
+
+== AWS Preparation
+
+. Run the following to check for the AWS Load Balancer role and create it if it is missing.
+
+[source,sh,role=copy]
+----
+aws iam get-role --role-name "AWSServiceRoleForElasticLoadBalancing" || aws iam create-service-linked-role --aws-service-name "elasticloadbalancing.amazonaws.com"
+----
+
+== Create the AWS Virtual Private Cloud (VPC) and Subnets
+
+For this scenario, we will be using a newly created VPC with both public and private subnets. All of the cluster resources will reside in the private subnet. The public subnet will be used for traffic to the Internet (egress).
+
+[NOTE]
+====
+If you already have a Transit Gateway (TGW) or similar, you can skip the public subnet configuration
+====
+
+[NOTE]
+====
+When creating subnets, make sure that subnet(s) are created in availability zones that have ROSA instances types available. If AZ is not “forced”, the subnet is created in a random AZ in the region. Force AZ using the `--availability-zone` argument in the `create-subnet` command.
+====
+
+Use `rosa list instance-types` to list the ROSA instance types
+
+Use `aws ec2 describe-instance-type-offerings` to check that your desired AZ supports your desired instance type
+
+Example using us-west-1, us-west-1a, and m5a.xlarge:  
++
+[source,sh]
+----
+aws ec2 describe-instance-type-offerings --location-type availability-zone \
+  --region us-west-1 \
+  --filters Name=location,Values=us-west-1a \
+  --output text | egrep m5a.xlarge
+----
++
+.Sample Output
+[source,texinfo]
+----
+INSTANCETYPEOFFERINGS	m5a.xlarge	us-west-1a	availability-zone
+----
++
+The result should display `INSTANCETYPEOFFERINGS [instance-type] [az] availability-zone` if your selected region supports your desired instance type (like in the example above.)
+
+. Configure the following environment variables:
++
+[source,sh]
+----
+export PL_CLUSTER_NAME=pl-sts-${GUID}
+export PL_REGION=us-west-1 # Make sure to use a region where you haven't deployed a cluster yet
+export PL_VERSION=4.13.4
+
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_PAGER=""
+----
+
+. Create a VPC for use by ROSA
+.. Create the VPC and return the ID as PL_VPC_ID
++
+[source,sh]
+----
+PL_VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 --region ${PL_REGION} | jq -r .Vpc.VpcId)
+
+echo ${PL_VPC_ID}
+----
++
+.Sample Output
+[source,texinfo]
+----
+vpc-0089636f591bd8b57
+----
+
+.. Tag the newly created VPC with the cluster name
++
+[source,sh]
+----
+aws ec2 create-tags --resources ${PL_VPC_ID} \
+  --region ${PL_REGION} \
+  --tags Key=Name,Value=${PL_CLUSTER_NAME}
+----
+
+.. Configure the VPC to allow DNS hostnames for their public IP addresses
++
+[source,sh]
+----
+aws ec2 modify-vpc-attribute \
+  --region ${PL_REGION} \
+  --vpc-id ${PL_VPC_ID} \
+  --enable-dns-hostnames
+----
+
+. Create a Public Subnet to allow egress traffic to the Internet
+.. Create the public subnet in the VPC CIDR block range and return the ID as PUBLIC_SUBNET
++
+[source,sh]
+----
+PL_PUBLIC_SUBNET=$(aws ec2 create-subnet --region ${PL_REGION} --vpc-id ${PL_VPC_ID} --cidr-block 10.0.128.0/17 | jq -r .Subnet.SubnetId)
+
+echo ${PL_PUBLIC_SUBNET}
+----
++
+.Sample Output
+[source,texinfo]
+----
+subnet-07665542bc85bc092
+----
+
+.. Tag the public subnet with the cluster name
++
+[source,sh]
+----
+aws ec2 create-tags \
+  --region ${PL_REGION} \
+  --resources ${PL_PUBLIC_SUBNET} \
+  --tags Key=Name,Value=${PL_CLUSTER_NAME}-public
+----
+
+. Create a Private Subnet for the cluster
+.. Create the private subnet in the VPC CIDR block range and return the ID as PL_PRIVATE_SUBNET
++
+[source,sh]
+----
+PL_PRIVATE_SUBNET=$(aws ec2 create-subnet \
+  --region ${PL_REGION} \
+  --vpc-id ${PL_VPC_ID} \
+  --cidr-block 10.0.0.0/17 | jq -r .Subnet.SubnetId)
+
+echo ${PL_PRIVATE_SUBNET}
+----
++
+.Sample Output
+[source,texinfo]
+----
+subnet-0299591443c7eb1d8
+----
+
+.. Tag the private subnet with the cluster name
++
+[source,sh]
+----
+aws ec2 create-tags \
+  --region ${PL_REGION} \
+  --resources ${PL_PRIVATE_SUBNET} \
+  --tags Key=Name,Value=${PL_CLUSTER_NAME}-private
+----
+
+.. Both subnets should now be visible in the AWS console
+
+. Create an Internet Gateway for NAT egress traffic
+
+.. Create the Internet Gateway and return the ID as PL_IGW
++
+[source,sh]
+----
+PL_IGW=$(aws ec2 create-internet-gateway --region ${PL_REGION} | jq -r .InternetGateway.InternetGatewayId)
+
+echo ${PL_IGW}
+----
++
+.Sample Output
+[source,texinfo]
+----
+igw-0309b87ea4bddc5f4
+----
+
+.. Attach the new Internet Gateway to the VPC
++
+[source,sh]
+----
+aws ec2 attach-internet-gateway \
+  --region ${PL_REGION} \
+  --vpc-id ${PL_VPC_ID} \
+  --internet-gateway-id ${PL_IGW}
+----
+
+.. Tag the Internet Gateway with the cluster name
++
+[source,sh]
+----
+aws ec2 create-tags \
+  --region ${PL_REGION} \
+  --resources ${PL_IGW} \
+  --tags Key=Name,Value=${PL_CLUSTER_NAME}
+----
+
+.. The new Internet Gateway should be created and attached to your VPC
+
+. Create a Route Table for NAT egress traffic
+.. Create the Route Table and return the ID as PL_RTB
++
+[source,sh]
+----
+PL_RTB=$(aws ec2 create-route-table --region ${PL_REGION} --vpc-id ${PL_VPC_ID} | jq -r .RouteTable.RouteTableId)
+
+echo ${PL_RTB}
+----
++
+.Sample Output
+[source,texinfo]
+----
+rtb-04c9cd43781c67135
+----
+
+.. Create a route with no IP limitations (0.0.0.0/0) to the Internet Gateway
++
+[source,sh]
+----
+aws ec2 create-route \
+  --region ${PL_REGION} \
+  --route-table-id ${PL_RTB} \
+  --destination-cidr-block 0.0.0.0/0 \
+  --gateway-id ${PL_IGW}
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "Return": true
+}
+----
+
+.. Verify the route table settings
++
+[source,sh]
+----
+aws ec2 describe-route-tables \
+  --region ${PL_REGION} \
+  --route-table-id ${PL_RTB}
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "RouteTables": [
+        {
+            "Associations": [],
+            "PropagatingVgws": [],
+            "RouteTableId": "rtb-04c9cd43781c67135",
+            "Routes": [
+                {
+                    "DestinationCidrBlock": "10.0.0.0/16",
+                    "GatewayId": "local",
+                    "Origin": "CreateRouteTable",
+                    "State": "active"
+                },
+                {
+                    "DestinationCidrBlock": "0.0.0.0/0",
+                    "GatewayId": "igw-0309b87ea4bddc5f4",
+                    "Origin": "CreateRoute",
+                    "State": "active"
+                }
+            ],
+            "Tags": [],
+            "VpcId": "vpc-0089636f591bd8b57",
+            "OwnerId": "870651848115"
+        }
+    ]
+}
+----
+
+.. Associate the Route Table with the Public subnet
++
+[source,sh]
+----
+aws ec2 associate-route-table \
+  --region ${PL_REGION} \
+  --subnet-id ${PL_PUBLIC_SUBNET} \
+  --route-table-id ${PL_RTB}
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "AssociationId": "rtbassoc-026c82779f7365623",
+    "AssociationState": {
+        "State": "associated"
+    }
+}
+----
+
+.. Tag the Route Table with the cluster name
++
+[source,sh]
+----
+aws ec2 create-tags \
+  --region ${PL_REGION} \
+  --resources ${PL_RTB} \
+  --tags Key=Name,Value=${PL_CLUSTER_NAME}
+----
+
+. Create a NAT Gateway for the Private network
+.. Allocate and elastic IP address and return the ID as PL_EIP
++
+[source,sh]
+----
+PL_EIP=$(aws ec2 allocate-address --region ${PL_REGION} --domain vpc | jq -r .AllocationId)
+
+echo ${PL_EIP}
+----
++
+.Sample Output
+[source,texinfo]
+----
+eipalloc-0543777bb726d925a
+----
+
+.. Create a new NAT Gateway in the Public subnet with the new Elastic IP address and return the ID as PL_NAT
++
+[source,sh]
+----
+PL_NAT=$(aws ec2 create-nat-gateway \
+  --region ${PL_REGION} \
+  --subnet-id ${PL_PUBLIC_SUBNET} \
+  --allocation-id ${PL_EIP} | jq -r .NatGateway.NatGatewayId)
+
+echo ${PL_NAT}
+----
++
+.Sample Output
+[source,texinfo]
+----
+nat-0a0f9ee1d8c5941e2
+----
+
+.. Tag the Elastic IP and NAT gateway with the cluster name
++
+[source,sh]
+----
+aws ec2 create-tags \
+  --region ${PL_REGION} \
+  --resources ${PL_EIP} \
+  --resources ${PL_NAT} \
+  --tags Key=Name,Value=${PL_CLUSTER_NAME}
+----
+
+.. The new NAT Gateway should be created and associated with your VPC
+
+. Create a Route Table for the Private subnet to the NAT Gateway
+.. Create a Route Table in the VPC and return the ID as PL_RTB_NAT
++
+[source,sh]
+----
+PL_RTB_NAT=$(aws ec2 create-route-table --region ${PL_REGION} --vpc-id ${PL_VPC_ID} \
+  | jq -r .RouteTable.RouteTableId)
+
+echo ${PL_RTB_NAT}
+----
++
+.Sample Output
+[source,texinfo]
+----
+rtb-010ff0fd5626fddfb
+----
+
+.. Loop through a Route Table check until it is created
++
+[source,sh]
+----
+while ! aws ec2 describe-route-tables --region ${PL_REGION} --route-table-id ${PL_RTB_NAT} | jq .; do sleep 1; done
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+  "RouteTables": [
+    {
+      "Associations": [],
+      "PropagatingVgws": [],
+      "RouteTableId": "rtb-010ff0fd5626fddfb",
+      "Routes": [
+        {
+          "DestinationCidrBlock": "10.0.0.0/16",
+          "GatewayId": "local",
+          "Origin": "CreateRouteTable",
+          "State": "active"
+        }
+      ],
+      "Tags": [],
+      "VpcId": "vpc-0089636f591bd8b57",
+      "OwnerId": "870651848115"
+    }
+  ]
+}
+----
+
+.. Create a route in the new Route Table for all addresses to the NAT Gateway
++
+[source,sh]
+----
+aws ec2 create-route \
+  --region ${PL_REGION} \
+  --route-table-id ${PL_RTB_NAT} \
+  --destination-cidr-block 0.0.0.0/0 \
+  --gateway-id ${PL_NAT}
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "Return": true
+}
+----
+
+.. Associate the Route Table with the Private subnet
++
+[source,sh]
+----
+aws ec2 associate-route-table \
+  --region ${PL_REGION} \
+  --subnet-id ${PL_PRIVATE_SUBNET} \
+  --route-table-id ${PL_RTB_NAT}
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "AssociationId": "rtbassoc-0a442b015541e69d4",
+    "AssociationState": {
+        "State": "associated"
+    }
+}
+----
+
+.. Tag the Route Table with the cluster name
++
+[source,sh]
+----
+aws ec2 create-tags \
+  --region ${PL_REGION} \
+  --resources ${PL_RTB_NAT} \
+  --tags Key=Name,Value=${PL_CLUSTER_NAME}-private
+----
+
+== Configure the AWS Security Token Service (STS) for use with ROSA
+
+The AWS Security Token Service (STS) allows us to deploy ROSA without needing a ROSA admin account, instead it uses roles and policies to gain access to the AWS resources needed to install and operate the cluster.
+
+This is a summary of the official OpenShift docs that can be used as a line by line install guide.
+
+// Note that some commands (OIDC for STS) will be hard coded to US-EAST-1, do not be tempted to change these to use $PL_region instead or you will fail installation.
+
+. Create the IAM Account Roles
++
+[source,sh]
+----
+rosa create account-roles --region ${PL_REGION} --mode auto --yes
+----
++
+.Sample Output
+[source,texinfo]
+----
+I: Logged in as 'rhpds-cloud' on 'https://api.openshift.com'
+I: Validating AWS credentials...
+I: AWS credentials are valid!
+I: Validating AWS quota...
+I: AWS quota ok. If cluster installation fails, validate actual AWS resource usage against https://docs.openshift.com/rosa/rosa_getting_started/rosa-required-aws-service-quotas.html
+I: Verifying whether OpenShift command-line tool is available...
+I: Current OpenShift Client Version: 4.13.5
+I: Creating account roles
+I: Creating roles using 'arn:aws:iam::870651848115:user/wkulhane@redhat.com-szrxx'
+I: Created role 'ManagedOpenShift-Installer-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-Installer-Role'
+I: Created role 'ManagedOpenShift-ControlPlane-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-ControlPlane-Role'
+I: Created role 'ManagedOpenShift-Worker-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-Worker-Role'
+I: Created role 'ManagedOpenShift-Support-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-Support-Role'
+I: To create an OIDC Config, run the following command:
+	rosa create oidc-config
+I: To create a cluster with these roles, run the following command:
+	rosa create cluster --sts
+----
+
+== Deploy ROSA cluster
+
+. Run the rosa cli to create your cluster
++
+[source,sh]
+----
+rosa create cluster \
+  --cluster-name ${PL_CLUSTER_NAME} \
+  --region ${PL_REGION} \
+  --version ${PL_VERSION} \
+  --subnet-ids=${PL_PRIVATE_SUBNET} \
+  --private-link --machine-cidr=10.0.0.0/16 \
+  --yes \
+  --sts
+----
++
+.Sample Output
+[source,texinfo]
+----
+W: In a future release STS will be the default mode.
+W: --sts flag won't be necessary if you wish to use STS.
+W: --non-sts/--mint-mode flag will be necessary if you do not wish to use STS.
+I: Using arn:aws:iam::870651848115:role/ManagedOpenShift-Installer-Role for the Installer role
+I: Using arn:aws:iam::870651848115:role/ManagedOpenShift-ControlPlane-Role for the ControlPlane role
+I: Using arn:aws:iam::870651848115:role/ManagedOpenShift-Worker-Role for the Worker role
+I: Using arn:aws:iam::870651848115:role/ManagedOpenShift-Support-Role for the Support role
+W: No OIDC Configuration found; will continue with the classic flow.
+W: You are choosing to use AWS PrivateLink for your cluster. STS clusters can only be private if AWS PrivateLink is used. Once the cluster is created, this option cannot be changed.
+I: Creating cluster 'pl-sts-szrxx'
+
+[...Output Omitted...]
+
+I:
+Run the following commands to continue the cluster creation:
+
+	rosa create operator-roles --cluster pl-sts-szrxx
+	rosa create oidc-provider --cluster pl-sts-szrxx
+
+I: To determine when your cluster is Ready, run 'rosa describe cluster -c pl-sts-szrxx'.
+I: To watch your cluster installation logs, run 'rosa logs install -c pl-sts-szrxx --watch'.
+----
+
+. Create the Operator Roles
++
+[source,sh]
+----
+rosa create operator-roles \
+  --region ${PL_REGION} \
+  --cluster ${PL_CLUSTER_NAME} \
+  --mode auto \
+  --yes
+----
++
+.Sample Output
+[source,texinfo]
+----
+I: Creating roles using 'arn:aws:iam::870651848115:user/wkulhane@redhat.com-szrxx'
+I: Created role 'pl-sts-szrxx-f3e4-openshift-cloud-network-config-controller-clou' with ARN 'arn:aws:iam::870651848115:role/pl-sts-szrxx-f3e4-openshift-cloud-network-config-controller-clou'
+I: Created role 'pl-sts-szrxx-f3e4-openshift-machine-api-aws-cloud-credentials' with ARN 'arn:aws:iam::870651848115:role/pl-sts-szrxx-f3e4-openshift-machine-api-aws-cloud-credentials'
+I: Created role 'pl-sts-szrxx-f3e4-openshift-cloud-credential-operator-cloud-cred' with ARN 'arn:aws:iam::870651848115:role/pl-sts-szrxx-f3e4-openshift-cloud-credential-operator-cloud-cred'
+I: Created role 'pl-sts-szrxx-f3e4-openshift-image-registry-installer-cloud-crede' with ARN 'arn:aws:iam::870651848115:role/pl-sts-szrxx-f3e4-openshift-image-registry-installer-cloud-crede'
+I: Created role 'pl-sts-szrxx-f3e4-openshift-ingress-operator-cloud-credentials' with ARN 'arn:aws:iam::870651848115:role/pl-sts-szrxx-f3e4-openshift-ingress-operator-cloud-credentials'
+I: Created role 'pl-sts-szrxx-f3e4-openshift-cluster-csi-drivers-ebs-cloud-creden' with ARN 'arn:aws:iam::870651848115:role/pl-sts-szrxx-f3e4-openshift-cluster-csi-drivers-ebs-cloud-creden'
+----
+
+. Create the OIDC provider
++
+[source,sh]
+----
+rosa create oidc-provider \
+  --region ${PL_REGION} \
+  --cluster ${PL_CLUSTER_NAME} \
+  --mode auto \
+  --yes
+----
++
+.Sample Output
+[source,texinfo]
+----
+I: Creating OIDC provider using 'arn:aws:iam::870651848115:user/wkulhane@redhat.com-szrxx'
+I: Created OIDC provider with ARN 'arn:aws:iam::870651848115:oidc-provider/rh-oidc.s3.us-east-1.amazonaws.com/2580qblb5efub2s84ogh2cfhhiqriumq'
+----
+
+. Validate that the cluster is now installing. The *State* should have moved beyond pending and show `validating`, `installing` or `ready`.
++
+[source,sh]
+----
+watch "rosa describe cluster --cluster ${PL_CLUSTER_NAME} | grep State"
+----
++
+.Sample Output
+[source,texinfo]
+----
+State:                      installing (Cluster is installing)
+----
+
+. Once the *State* shows as `installing` you can watch the install logs
++
+[source,sh]
+----
+rosa logs install --cluster ${PL_CLUSTER_NAME} --watch
+----
+
+== Validate the cluster
+
+Once the cluster has finished installing it is time to validate. Validation when using Private Link requires the use of a jump host.
+
+. Create a jumphost instance using the AWS CLI
+
+.. Create an additional Security Group for the jumphost
++
+[source,sh]
+----
+TAG_SG="${PL_CLUSTER_NAME}-jumphost-sg"
+
+aws ec2 create-security-group \
+  --region ${PL_REGION} \
+  --group-name ${PL_CLUSTER_NAME}-jumphost-sg \
+  --description ${PL_CLUSTER_NAME}-jumphost-sg \
+  --vpc-id ${PL_VPC_ID} \
+  --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=$TAG_SG}]"
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "GroupId": "sg-054cc910b9a52fb93",
+    "Tags": [
+        {
+            "Key": "Name",
+            "Value": "pl-sts-szrxx-jumphost-sg"
+        }
+    ]
+}
+----
+
+.. Grab the Security Group Id generated in the previous step
++
+[source,sh]
+----
+PL_PUBLIC_SECURITY_GROUP_ID=$(aws ec2 describe-security-groups \
+  --region ${PL_REGION} \
+  --filters "Name=tag:Name,Values=${PL_CLUSTER_NAME}-jumphost-sg" \
+  | jq -r '.SecurityGroups[0].GroupId')
+
+echo ${PL_PUBLIC_SECURITY_GROUP_ID}
+----
++
+.Sample Output
+[source,texinfo]
+----
+sg-054cc910b9a52fb93
+----
+
+.. Add a rule to allow ssh into the Public Security Group
++
+[source,sh]
+----
+aws ec2 authorize-security-group-ingress \
+  --region ${PL_REGION} \
+  --group-id ${PL_PUBLIC_SECURITY_GROUP_ID} \
+  --protocol tcp \
+  --port 22 \
+  --cidr 0.0.0.0/0
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "Return": true,
+    "SecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-0dd17410dabd06da3",
+            "GroupId": "sg-054cc910b9a52fb93",
+            "GroupOwnerId": "870651848115",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIpv4": "0.0.0.0/0"
+        }
+    ]
+}
+----
+
+.. Create a key pair for your jumphost
++
+[source,sh]
+----
+aws ec2 create-key-pair \
+  --region ${PL_REGION} \
+  --key-name ${PL_CLUSTER_NAME}-key \
+  --query 'KeyMaterial' \
+  --output text > ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem
+
+chmod 600 ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem
+----
+
+.. Determine the AMI ID to use for your jump host and store it in PL_AMI_ID
++
+[source,sh]
+----
+export PL_AMI_ID=$(aws ssm get-parameters \
+  --region ${PL_REGION} \
+  --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 \
+  | jq -r .Parameters[0].Value)
+
+echo ${PL_AMI_ID}
+----
++
+.Sample Output
+[source,texinfo]
+----
+ami-03c6fb82ee0612587
+----
++
+The PL_AMI_ID corresponds to Amazon Linux within the private link region.
+
+.. Launch an ec2 instance for your jumphost using the parameters defined in earlier steps:
++
+[source,sh]
+----
+PL_TAG_VM="${PL_CLUSTER_NAME}-jumphost-vm"
+
+aws ec2 run-instances \
+  --image-id ${PL_AMI_ID} \
+  --region ${PL_REGION} \
+  --count 1 \
+  --instance-type t2.micro \
+  --key-name ${PL_CLUSTER_NAME}-key \
+  --security-group-ids ${PL_PUBLIC_SECURITY_GROUP_ID} \
+  --subnet-id ${PL_PUBLIC_SUBNET} \
+  --associate-public-ip-address \
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${PL_TAG_VM}}]"
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "Groups": [],
+    "Instances": [
+        {
+            "AmiLaunchIndex": 0,
+            "ImageId": "ami-03c6fb82ee0612587",
+            "InstanceId": "i-065d9e463ba66d9fa",
+
+[...Output Omitted...]
+
+    ],
+    "OwnerId": "870651848115",
+    "ReservationId": "r-046dc760e68896379"
+}
+----
++
+This instance will be associated with a Public IP directly.
+
+.. Wait until the ec2 instance is in `Running` state, grab the Public IP associated to the instance and check the if the ssh port and:
++
+[source,sh]
+----
+export IP_JUMPBOX=$(aws ec2 describe-instances \
+  --region ${PL_REGION} \
+  --filters "Name=tag:Name,Values=${PL_TAG_VM}" \
+  | jq -r '.Reservations[0].Instances[0].PublicIpAddress')
+
+echo ${IP_JUMPBOX}
+----
++
+.Sample Output
+[source,texinfo]
+----
+54.153.92.19
+----
+
+.. Test connecting to your jumpbox
++
+[source,sh]
+----
+ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem ec2-user@${IP_JUMPBOX}
+----
+
+.. Log back out of your jumpbox (`Ctrl-d`)
+
+. Create a ROSA admin user and save the login command for use later
++
+[source,sh]
+----
+rosa create admin \
+  --cluster ${PL_CLUSTER_NAME} \
+  | tee $HOME/${PL_CLUSTER_NAME}-login.cmd
+----
++
+.Sample Output
+[source,texinfo]
+----
+INFO: Admin account has been added to cluster 'pl-sts-szrxx'.
+INFO: Please securely store this generated password. If you lose this password you can delete and recreate the cluster admin user.
+INFO: To login, run the following command:
+
+   oc login https://api.pl-sts-szrxx.93vg.p1.openshiftapps.com:6443 --username cluster-admin --password nBfNx-xrBrX-ewgZt-eLXDg
+
+INFO: It may take several minutes for this access to become active.
+----
++
+Note the DNS name of your private cluster, use the rosa describe command if needed
++
+[source,sh]
+----
+rosa describe cluster --cluster ${PL_CLUSTER_NAME} | grep API
+----
++
+.Sample Output
+[source,texinfo,options=nowrap]
+----
+API URL:                    https://api.pl-sts-szrxx.93vg.p1.openshiftapps.com:6443
+Console URL:                https://console-openshift-console.apps.pl-sts-szrxx.93vg.p1.openshiftapps.com
+----
+
+. Set variable PL_BASE_DOMAIN
++
+[source,sh]
+----
+export PL_BASE_DOMAIN=pl-sts-szrxx.93vg.p1.openshiftapps.com
+----
+
+. On your bastion VM update `/etc/hosts` to point the openshift domain names to localhost. Use the DNS of your openshift cluster as described in the previous step
++
+[source,sh]
+----
+echo "
+127.0.0.1 api.${PL_BASE_DOMAIN}
+127.0.0.1 console-openshift-console.apps.${PL_BASE_DOMAIN}
+127.0.0.1 oauth-openshift.apps.${PL_BASE_DOMAIN}
+" >>/etc/hosts
+----
+
+. SSH to your jumpbhost instance, tunneling traffic for the appropriate hostnames. Be sure to use your new/existing private key, the OpenShift DNS for $YOUR_OPENSHIFT_DNS and your jump host IP for $YOUR_EC2_IP
+
++
+[source,sh]
+----
+sudo ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem \
+  -L 6443:api.${PL_BASE_DOMAIN}:6443 \
+  -L 443:console-openshift-console.apps.${PL_BASE_DOMAIN}:443 \
+  -L 80:console-openshift-console.apps.${PL_BASE_DOMAIN}:80 \
+  ec2-user@${IP_JUMPBOX}
+----
+
+. With the SSH connection active open another terminal window to your bastion VM.
+. Log into the cluster using oc login command from the create admin command above. For example:
++
+[source,sh]
+----
+oc login https://api.pl-sts-szrxx.93vg.p1.openshiftapps.com:6443 --username cluster-admin --password nBfNx-xrBrX-ewgZt-eLXDg
+----
++
+This login command should use your SSH tunnel to connect to your Private Link ROSA cluster.
+
+. To validate logout of the cluster (`oc logout`), then close the SSH connection and try logging in again. It should fail:
++
+.Sample Output
+[source,texinfo]
+----
+error: dial tcp 127.0.0.1:6443: connect: connection refused - verify you have provided the correct host and port and that the server is currently running.
+----
+
+== Exercise: Set up your personal workstation
+
+So far you have set up the bastion VM of your environment so that you can connect to your private link cluster.
+
+As an exercise set up your workstation so that you can connect to your cluster using the web console.
+
+== Cleanup
+
+. Delete your PrivateLink ROSA cluster
++
+[source,sh]
+----
+rosa delete cluster --cluster ${PL_CLUSTER_NAME} --yes
+----
+
+. Watch the logs and wait until the cluster is deleted
++
+[source,sh]
+----
+rosa logs uninstall --cluster ${PL_CLUSTER_NAME} --watch
+----
+
+. Clean up the STS roles
++
+Note you can get the correct commands with the ID filled in from the output of the previous step.
++
+[source,sh]
+----
+rosa delete operator-roles -c <id> --mode auto --yes
+rosa delete oidc-provider -c <id> --mode auto --yes
+----
+
+. Delete AWS resources
++
+[source,sh]
+----
+aws ec2 delete-nat-gateway --nat-gateway-id ${PL_NAT} | jq .
+aws ec2 release-address --allocation-id=${PL_EIP} | jq .
+aws ec2 detach-internet-gateway --vpc-id ${PL_VPC_ID} --internet-gateway-id ${PL_IGW} | jq .
+aws ec2 delete-subnet --subnet-id=${PL_PRIVATE_SUBNET} | jq .
+PL_aws ec2 delete-subnet --subnet-id=${PL_PUBLIC_SUBNET} | jq .
+aws ec2 delete-route-table --route-table-id=${PL_RTB} | jq .
+aws ec2 delete-route-table --route-table-id=${PL_RTB_NAT} | jq .
+aws ec2 delete-internet-gateway --internet-gateway-id ${PL_IGW} | jq .
+aws ec2 delete-vpc --vpc-id{=$PL_VPC_ID} | jq .
+----

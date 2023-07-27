@@ -3,16 +3,16 @@ modules:
   index:
     name: Introduction
     exit_sign: Environment
-  100-setup/1-environment:
+  100-setup/lab_1_environment:
     name: Environment
     exit_sign: Deploy ROSA cluster
-  100-setup/2-cluster-creation:
+  100-setup/lab_2a_cluster_creation:
     name: Deploy ROSA cluster
     exit_sign: Deploy ROSA cluster (HCP)
-  100-setup/2-cluster-creation-hcp:
+  100-setup/lab_2b_cluster_creation_hcp:
     name: Deploy ROSA cluster (HCP)
     exit_sign: Create admin user
-  100-setup/3-create-admin-user:
+  100-setup/lab_3_create_admin-user:
     name: Create admin user
     exit_sign: Configure IDP (Red Hat SSO)
   200-ops/lab_4_configure_idp_keycloak:
@@ -62,4 +62,22 @@ modules:
     exit_sign: Continue
   400-service-mesh/lab_19_service_mesh_observe:
     name: Configure and Observe Traffic
+    exit_sign: Exit
+  100-setup/lab_x_cluster_creation_private_link:
+    name: Create Cluster with PrivateLink
+    exit_sign: Exit
+  200-ops/lab_x_configure_efs_csi_driver:
+    name: Configure EFS CSI Driver
+    exit_sign: Exit
+  200-ops/lab_x_configure_rosa_ecr:
+    name: Configure pulling images from AWS Container Registry
+    exit_sign: Exit
+  200-ops/lab-x-custom_domains_for_apps:
+    name: Configure and secure custom domains for applications
+    exit_sign: Exit
+  200-ops/lab_x_oadp:
+    name: Backup and restore using OADP
+    exit_sign: Exit
+  300-apps/lab_x_aws_secrets_manager:
+    name: Integration with AWS Secrets Manager
     exit_sign: Exit

@@ -9,7 +9,7 @@ We'll then deploy the application to our ROSA cluster and connect to the databas
 . First, let's create a namespace (also known as a project in OpenShift).
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc new-project microsweeper-ex
 ----
@@ -31,7 +31,7 @@ to build a new example application in Ruby. Or use kubectl to deploy a simple Ku
 . Create the Amazon DynamoDB table resource.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws dynamodb create-table \
   --table-name microsweeper-scores-${GUID} \
@@ -83,7 +83,7 @@ Lucky for us, we've already deployed our ROSA cluster using AWS STS, so using IA
 . First, create a service account to use to assume an IAM role.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n microsweeper-ex create serviceaccount microsweeper
 ----
@@ -97,9 +97,9 @@ serviceaccount/microsweeper created
 . Next, let's create a trust policy document which will define what service account can assume our role.
 To create the trust policy document, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-cat <<EOF > $HOME/trust-policy.json
+cat <<EOF > ${HOME}/trust-policy.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -123,9 +123,9 @@ EOF
 . Next, let's take the trust policy document and use it to create a role.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-aws iam create-role --role-name irsa_${GUID} --assume-role-policy-document file://$HOME/trust-policy.json --description "IRSA Role (${GUID}"
+aws iam create-role --role-name irsa-${GUID} --assume-role-policy-document file://${HOME}/trust-policy.json --description "IRSA Role (${GUID}"
 ----
 +
 .Sample Output
@@ -163,17 +163,17 @@ aws iam create-role --role-name irsa_${GUID} --assume-role-policy-document file:
 This will allow our application to read and write to our Amazon DynamoDB table.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-aws iam attach-role-policy --role-name irsa_${GUID} --policy-arn=arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+aws iam attach-role-policy --role-name irsa-${GUID} --policy-arn=arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
 ----
 
 . Finally, let's annotate the service account with the ARN of the IAM role we created above.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-oc -n microsweeper-ex annotate serviceaccount microsweeper eks.amazonaws.com/role-arn=arn:aws:iam::$(aws sts get-caller-identity --query 'Account' --output text):role/irsa_${GUID}
+oc -n microsweeper-ex annotate serviceaccount microsweeper eks.amazonaws.com/role-arn=arn:aws:iam::$(aws sts get-caller-identity --query 'Account' --output text):role/irsa-${GUID}
 ----
 +
 .Sample Output
@@ -188,20 +188,20 @@ Now that we've got a DynamoDB instance up and running and our IRSA configuration
 
 . In order to build the application you will need the Java JDK 17 and the Quarkus CLI installed. Java JDK 17 is already installed on your bastion VM so let's install the Quarkus CLI:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 curl -Ls https://sh.jbang.dev | bash -s - trust add https://repo1.maven.org/maven2/io/quarkus/quarkus-cli/
 curl -Ls https://sh.jbang.dev | bash -s - app install --fresh --force quarkus@quarkusio
 
-echo "export JAVA_HOME=/usr/lib/jvm/jre-11-openjdk" >>$HOME/.bashrc
-echo "export PATH=\$JAVA_HOME/bin:\$PATH" >>$HOME/.bashrc
+echo "export JAVA_HOME=/usr/lib/jvm/jre-11-openjdk" >>${HOME}/.bashrc
+echo "export PATH=\$JAVA_HOME/bin:\$PATH" >>${HOME}/.bashrc
 
-source $HOME/.bashrc
+source ${HOME}/.bashrc
 ----
 
 . Double check the Quarkus CLI version:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 quarkus --version
 ----
@@ -209,15 +209,15 @@ quarkus --version
 .Sample Output
 [source,text,options=nowrap]
 ----
-3.1.0.Final
+3.2.2.Final
 ----
 
 . Now, let's clone the application from GitHub.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-cd $HOME
+cd ${HOME}
 
 git clone https://github.com/rh-mobb/rosa-workshop-app.git
 ----
@@ -225,15 +225,15 @@ git clone https://github.com/rh-mobb/rosa-workshop-app.git
 . Next, let's change directory into the newly cloned Git repository.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-cd $HOME/rosa-workshop-app
+cd ${HOME}/rosa-workshop-app
 ----
 
 . Next, we will add the OpenShift extension to the Quarkus CLI.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 quarkus ext add openshift
 ----
@@ -248,9 +248,9 @@ Looking for the newly published extensions in registry.quarkus.io
 . Now, we'll configure Quarkus to use the DynamoDB instance that we created earlier in this section.
 To do so, we'll create an `application.properties` file using by running the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-cat <<EOF > $HOME/rosa-workshop-app/src/main/resources/application.properties
+cat <<EOF > ${HOME}/rosa-workshop-app/src/main/resources/application.properties
 # AWS DynamoDB configurations
 %dev.quarkus.dynamodb.endpoint-override=http://localhost:8000
 %prod.quarkus.openshift.env.vars.aws_region=$(aws configure get region)
@@ -275,7 +275,7 @@ EOF
 We'll do this using https://github.com/openshift/source-to-image[source-to-image], a tool built-in to OpenShift.
 To start the build and deploy, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 quarkus build --no-tests
 ----
@@ -284,13 +284,14 @@ quarkus build --no-tests
 [source,text,options=nowrap]
 ----
 [...Lots of Output Omitted...]
+
 [INFO] Installing /home/rosa/rosa-workshop-app/target/microsweeper-appservice-1.0.0-SNAPSHOT.jar to /home/rosa/.m2/repository/org/acme/microsweeper-appservice/1.0.0-SNAPSHOT/microsweeper-appservice-1.0.0-SNAPSHOT.jar
 [INFO] Installing /home/rosa/rosa-workshop-app/pom.xml to /home/rosa/.m2/repository/org/acme/microsweeper-appservice/1.0.0-SNAPSHOT/microsweeper-appservice-1.0.0-SNAPSHOT.pom
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time: 02:02 min
-[INFO] Finished at: 2023-04-18T18:32:26Z
+[INFO] Total time:  01:47 min
+[INFO] Finished at: 2023-07-27T09:01:57Z
 [INFO] ------------------------------------------------------------------------
 ----
 
@@ -384,15 +385,15 @@ image::../media/rosa-console-route-link.png[OpenShift Web Console - Route Link]
 
 You can also get the the URL for your application using the command line:
 
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-oc -n microsweeper-ex get route microsweeper-appservice -o jsonpath='{.spec.host}'
+echo "http://$(oc -n microsweeper-ex get route microsweeper-appservice -o jsonpath='{.spec.host}')"
 ----
 
 .Sample Output
 [source,text,options=nowrap]
 ----
-microsweeper-appservice-microsweeper-ex.apps.rosa-6n4s8.1c1c.p1.openshiftapps.com[rosa@bastion rosa-workshop-app]$
+http://microsweeper-appservice-microsweeper-ex.apps.rosa-6n4s8.1c1c.p1.openshiftapps.com
 ----
 
 === Application IP
@@ -401,7 +402,7 @@ Let's take a quick look at what IP the application resolves to.
 
 Back in your bastion VM, run the following command:
 
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 nslookup $(oc -n microsweeper-ex get route microsweeper-appservice -o jsonpath='{.spec.host}')
 ----
@@ -419,8 +420,7 @@ Name:	microsweeper-appservice-microsweeper-ex.apps.rosa-6n4s8.1c1c.p1.openshifta
 Address: 54.191.151.187
 ----
 
-Notice the IP address;
-can you guess where it comes from?
+Notice the IP address; can you guess where it comes from?
 
 It comes from the ROSA Load Balancer.
 In this workshop, we are using a public cluster which means the load balancer is exposed to the Internet.

@@ -475,11 +475,11 @@ oqOcsVoatIt7kDAPtz0K+1Md0g==
 </key>
 ----
 
-. Add DNS Entries: In order to resolve the ROSA Cluster domain name, you will need to either add the DNS server and the Route 53 Hosted Domain for the cluster to your VPN settings or /etc/hosts in machine you are connecting from.
+. Add DNS Entries: In order to resolve the ROSA Cluster domain name, you will need to add the DNS server and the Route 53 Hosted Domain for the cluster to your VPN settings.
 +
 The DNS server will be the `x.x.x.2`` address of your VPC CIDR. For example, if you VPC CIDR is `10.66.0.0/16` then your DNS server will be `10.66.0.2`.
 +
-You can find the VPC ( machine ) CIDR with this command:
+You can find the VPC (machine) CIDR with this command:
 +
 [source,sh]
 ----
@@ -511,9 +511,44 @@ rosa describe cluster \
 67s3.p1.openshiftapps.com
 ----
 
+. Update the `${HOME}/${PL_CLUSTER_NAME}.ovpn` configuration file to add three lines of DNS information just above the line starting with `<ca>`. Make sure you use the actual values that you retrieved earlier.
++
+[source,texinfo]
+----
+dhcp-option DNS 10.0.0.2
+push "dhcp-option DOMAIN pl-sts-hfw79.aano.p1.openshiftapps.com"
+register-dns
+----
++
+It should look similar to this:
++
+.Sample Output
+[source,texinfo]
+----
+client
+dev tun
+proto udp
+remote cvpn-endpoint-087b2719f4d0c3e3c.prod.clientvpn.us-west-1.amazonaws.com 443
+remote-random-hostname
+resolv-retry infinite
+nobind
+remote-cert-tls server
+cipher AES-256-GCM
+verb 3
+dhcp-option DNS 10.0.0.2
+push "dhcp-option DOMAIN pl-sts-hfw79.aano.p1.openshiftapps.com"
+register-dns
+<ca>
+-----BEGIN CERTIFICATE-----
+
+[...Output Omitted...]
+----
+
+=== Connecting to the VPN from macOS
+
 . Import the `${PL_CLUSTER_NAME}.ovpn` file into your VPN Software.
 +
-*macOS*: just double click the `${PL_CLUSTER_NAME}.ovpn` and it will be imported automatically into your VPN client.
+On *macOS* you can just double click the `${PL_CLUSTER_NAME}.ovpn` and it will be imported automatically into your VPN client.
 
 . Update the DNS settings for the VPN connection with the DNS Server and base domain that you retrieved before.
 +
@@ -542,3 +577,85 @@ https://console-openshift-console.apps.pl-sts-hfw79.aano.p1.openshiftapps.com
 ----
 
 You should be able to reach this URL now when connected to the VPN. And you should be able to use the `cluster-admin` credentials (if you created them earlier) to log into the cluster.
+
+== Connecting to the VPN from Linux (RHEL 9)
+
+On RHEL 9 you can install OpenVPN as follows:
+
+. Install EPEL:
++
+[source,sh]
+----
+sudo dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+----
+
+. Enable the OpenVPN3 repo:
++
+[source,sh]
+----
+dnf -y copr enable dsommers/openvpn3
+----
+
+. Finally install OpenVPN3:
++
+[source,sh]
+----
+dnf -y install openvpn3-client
+----
+
+. Now you can start the VPN connection:
++
+[source,sh]
+----
+openvpn3 session-start --config ${HOME}/${PL_CLUSTER_NAME}.ovpn
+----
++
+.Sample Output
+[source,texinfo]
+----
+Using configuration profile from file: pl-sts-hfw79.ovpn
+Session path: /net/openvpn/v3/sessions/8a57c6c2sa9e6s4d8cs95d7s3c4b25dd6271
+Connected
+----
+
+. You can double check your connection(s):
++
+[source,sh]
+----
+openvpn3 sessions-list
+----
++
+.Sample Output
+[source,texinfo]
+----
+-----------------------------------------------------------------------------
+        Path: /net/openvpn/v3/sessions/8a57c6c2sa9e6s4d8cs95d7s3c4b25dd6271
+     Created: Thu Aug  3 19:34:16 2023                  PID: 32276
+       Owner: rosa                                   Device: tun0
+ Config name: pl-sts-hfw79.ovpn  (Config not available)
+Session name: 6504d9ec9512.cvpn-endpoint-087b2719f4d0c3e3c.prod.clientvpn.us-west-1.amazonaws.com
+      Status: Connection, Client connected
+----
+
+. Now you can log into the OpenShift cluster using the `oc login` command.
+
+. To disconnect from the VPN you can run the following command:
++
+[source,sh]
+----
+openvpn3 session-manage --session-path $(openvpn3 sessions-list | grep sessions | awk -c '{print $2}') --disconnect
+----
++
+.Sample Output
+[source,texinfo]
+----
+Initiated session shutdown.
+
+Connection statistics:
+     BYTES_IN...................31123
+     BYTES_OUT..................31717
+     PACKETS_IN...................714
+     PACKETS_OUT..................718
+     TUN_BYTES_IN.................384
+     TUN_PACKETS_IN.................8
+----

@@ -700,7 +700,7 @@ chmod 600 ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem
 +
 [source,sh,role=copy]
 ----
-export PL_AMI_ID=$(aws ssm get-parameters \
+PL_AMI_ID=$(aws ssm get-parameters \
   --region ${PL_REGION} \
   --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 \
   | jq -r .Parameters[0].Value)
@@ -763,7 +763,7 @@ This instance will be associated with a Public IP directly.
 +
 [source,sh,role=copy]
 ----
-export IP_JUMPHOST=$(aws ec2 describe-instances \
+IP_JUMPHOST=$(aws ec2 describe-instances \
   --region ${PL_REGION} \
   --filters "Name=tag:Name,Values=${PL_TAG_VM}" \
   | jq -r '.Reservations[0].Instances[0].PublicIpAddress')
@@ -808,8 +808,8 @@ INFO: To login, run the following command:
 
 INFO: It may take several minutes for this access to become active.
 ----
-+
-Note the DNS name of your private cluster, use the rosa describe command if needed
+
+. Note the DNS name of your private cluster, use the rosa describe command if needed
 +
 [source,sh,role=copy]
 ----
@@ -827,9 +827,16 @@ Console URL:                https://console-openshift-console.apps.pl-sts-szrxx.
 +
 [source,sh,role=copy]
 ----
-export PL_BASE_DOMAIN=pl-sts-szrxx.93vg.p1.openshiftapps.com
+PL_BASE_DOMAIN=${PL_CLUSTER_NAME}.$(rosa describe cluster -c ${PL_CLUSTER_NAME} -o json | jq -r '.dns.base_domain')
 
 echo "export PL_BASE_DOMAIN=${PL_BASE_DOMAIN}" >>${HOME}/variables
+echo ${PL_BASE_DOMAIN}
+----
++
+.Sample Output
+[source,texinfo,options=nowrap]
+----
+pl-sts-szrxx.93vg.p1.openshiftapps.com
 ----
 
 . On your bastion VM update `/etc/hosts` to point the openshift domain names to localhost. Use the DNS of your openshift cluster as described in the previous step
@@ -843,7 +850,7 @@ echo "
 " >>/etc/hosts
 ----
 
-. SSH to your jumphost instance, tunneling traffic for the appropriate hostnames. Be sure to use your new/existing private key, the OpenShift DNS for $YOUR_OPENSHIFT_DNS and your jumphost IP for ${YOUR_EC2_IP}
+. SSH to your jumphost instance, tunneling traffic for the appropriate hostnames.
 +
 [source,sh,role=copy]
 ----

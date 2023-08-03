@@ -404,8 +404,6 @@ aws ec2 export-client-vpn-client-configuration \
 ----
 
 . Run the following commands to add the certificates created in the first step to the VPN Configuration file.
-
-note: make sure you are still in the easy rsa / pki directory.
 +
 [source,sh]
 ----
@@ -520,7 +518,7 @@ rosa describe cluster \
 . Update the DNS settings for the VPN connection with the DNS Server and base domain that you retrieved before.
 +
 .Example
-image::media/vpn-dns-settings.png[width=80%]
+image::../media/vpn-dns-settings.png[width=80%]
 
 . Connect your VPN.
 +

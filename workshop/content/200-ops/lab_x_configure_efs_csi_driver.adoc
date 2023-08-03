@@ -390,7 +390,7 @@ fsmt-0822300a0bc94598a
 
 [WARNING]
 ====
-If you followed the instructions above to create a region wide EFS mount, skip the following steps and proceed to “Create a Storage Class for the EFS volume”
+If you followed the instructions above to create a region wide EFS mount, skip the following steps and proceed to the *Create Storage Class* section!
 ====
 
 . Select the first subnet that you will make your EFS mount in (this will by default select the same Subnet your first node is in)

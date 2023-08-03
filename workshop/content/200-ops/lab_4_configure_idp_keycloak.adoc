@@ -169,7 +169,6 @@ true
 This step sets environment variables based on the installation that are needed in future steps.
 ====
 
-+
 [source,sh,role=copy]
 ----
 export SSO_ADMIN_CONSOLE=https://$(oc -n ${SSO_NAMESPACE} get route keycloak -o json | jq -r '.status.ingress[0].host')

@@ -78,7 +78,7 @@ modules:
   200-ops/lab_x_configure_rosa_ecr:
     name: Configure pulling images from AWS Container Registry
     exit_sign: Exit
-  200-ops/lab-x-custom_domains_for_apps:
+  200-ops/lab_x_custom_domains_for_apps:
     name: Configure and secure custom domains for applications
     exit_sign: Exit
   200-ops/lab_x_oadp:

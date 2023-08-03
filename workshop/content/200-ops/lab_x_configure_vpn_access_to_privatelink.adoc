@@ -511,7 +511,9 @@ rosa describe cluster \
 67s3.p1.openshiftapps.com
 ----
 
-. Update the `${HOME}/${PL_CLUSTER_NAME}.ovpn` configuration file to add three lines of DNS information just above the line starting with `<ca>`. Make sure you use the actual values that you retrieved earlier.
+. Update the `${HOME}/${PL_CLUSTER_NAME}.ovpn` configuration file to add two or three lines of DNS information just above the line starting with `<ca>`. Make sure you use the actual values that you retrieved earlier.
++
+If you are planning on using this connection file from a macOS client *do not add the register-dns line*.
 +
 [source,texinfo]
 ----

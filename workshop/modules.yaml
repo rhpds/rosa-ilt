@@ -12,7 +12,7 @@ modules:
   100-setup/lab_2b_cluster_creation_hcp:
     name: Deploy a ROSA cluster (HCP)
     exit_sign: Continue
-  100-setup/lab_3_create_admin-user:
+  100-setup/lab_3_create_admin_user:
     name: Create Admin User
     exit_sign: Continue
   200-ops/lab_4_configure_idp_keycloak:
@@ -64,7 +64,10 @@ modules:
     name: Configure and Observe Traffic
     exit_sign: Exit
   100-setup/lab_x_cluster_creation_private_link:
-    name: Create Cluster with PrivateLink
+    name: Create ROSA Cluster with PrivateLink
+    exit_sign: Exit
+  200-ops/lab_x_configure_vpn_access_to_privatelink:
+    name: Configure VPN Access to a PrivateLink ROSA cluster
     exit_sign: Exit
   200-ops/200-ops/lab_x_configure_idp_cognito:
     name: Configure Cluster Authentication Using Amazon Cognito

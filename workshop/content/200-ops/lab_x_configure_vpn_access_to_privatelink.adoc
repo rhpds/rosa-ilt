@@ -1,0 +1,546 @@
+= Setup a VPN Connection into a Private Link ROSA cluster with OpenVPN
+
+When you configure a Red Hat OpenShift on AWS (ROSA) cluster with a private link configuration, you will need connectivity to this private network in order to access your cluster. This guide will show you how to configute an AWS Client VPN connection so you won't need to setup and configure Jump Boxes.
+
+== Set Environment Variables
+
+Start by setting environment variables that we will use to setup the VPN connection.
+
+. If you just deployed the cluster using the private link instructions you should have a file `${HOME}/variables` with all information. Just source it:
++
+[source,sh]
+----
+source ${HOME}/variables
+
+echo ${PL_CLUSTER_NAME}
+----
++
+.Sample Output
+[source,texinfo]
+----
+pl-sts-d4lf4
+----
+
+. If you created your cluster otherwise just set the `${PL_CLUSTER_NAME}` variable to your private link cluster.
+. Set some more variables. You may check if the two variables `${PL_REGION}` and `${PL_PRIVATE_SUBNET}` have already been set via your `variables` file first. But regardless running the commands below should yield the same result if they are already set.
++
+[source,sh]
+----
+VPN_CLIENT_CIDR=172.16.0.0/16
+
+PL_REGION=$(rosa describe cluster -c ${PL_CLUSTER_NAME} -o json | jq -r .region.id)
+PL_PRIVATE_SUBNET=$(rosa describe cluster -c ${PL_CLUSTER_NAME} -o json | jq -r '.aws.subnet_ids[]')
+
+echo "Region: ${PL_REGION}, ${PL_PRIVATE_SUBNET}"
+----
++
+.Sample Output
+[source,texinfo]
+----
+Region: us-west-1, subnet-00136c85e5b98ae38
+----
+
+== Create certificates to use for your VPN Connection
+
+There are many ways and methods to create certificates for VPN, the guide below is one of the ways that works well. Note, that whatever method you use, make sure it supports “X509v3 Extended Key Usage”.
+
+. Clone OpenVPN/easy-rsa
++
+[source,sh]
+----
+cd ${HOME}
+
+git clone https://github.com/OpenVPN/easy-rsa.git
+
+cd ${HOME}/easy-rsa/easyrsa3
+----
+
+. Initialize the PKI
++
+[source,sh]
+----
+./easyrsa init-pki
+----
++
+.Sample Output
+[source,texinfo]
+----
+Notice
+------
+'init-pki' complete; you may now create a CA or requests.
+
+Your newly created PKI dir is:
+* /home/rosa/easy-rsa/easyrsa3/pki
+
+Using Easy-RSA configuration:
+* /home/rosa/easy-rsa/easyrsa3/pki/vars
+
+IMPORTANT:
+  Easy-RSA 'vars' template file has been created in your new PKI.
+  Edit this 'vars' file to customise the settings for your PKI.
+  To use a global vars file, use global option --vars=<FILE>
+----
+
+. Edit certificate parameters.
++
+Uncomment and edit the values of all examples below in the copied template file:
++
+[source,sh]
+----
+vim ${HOME}/easy-rsa/easyrsa3/pki/vars
+----
++
+.Sample Output
+[source,texinfo]
+----
+set_var EASYRSA_REQ_COUNTRY   "US"
+set_var EASYRSA_REQ_PROVINCE  "California"
+set_var EASYRSA_REQ_CITY      "San Francisco"
+set_var EASYRSA_REQ_ORG       "Copyleft Certificate Co"
+set_var EASYRSA_REQ_EMAIL     "me@example.net"
+set_var EASYRSA_REQ_OU        "My Organizational Unit"
+
+set_var EASYRSA_KEY_SIZE        2048
+----
+
+. Create the CA (hit Enter at the prompt for the *Common Name*):
++
+[source,sh]
+----
+./easyrsa build-ca nopass
+----
++
+.Sample Output
+[source,texinfo]
+----
+Using Easy-RSA 'vars' configuration:
+* /home/rosa/easy-rsa/easyrsa3/pki/vars
+
+Using SSL:
+* openssl OpenSSL 3.0.7 1 Nov 2022 (Library: OpenSSL 3.0.7 1 Nov 2022)
+....+.........+..+.............+..+...+...+...+....+...+..+.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+.......+..+......+....+...+...+.....+.+.....+.........+.......+..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*........+.................+..........+...+............+..+......+.........+......+.+...........+....+.....+.............+...+............+..+...+...+...+....+...+...+.....+.+....................+...+.......+...+...+..+...+...+.+.....+..................+...+....+...+.....+.+.....+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+.+...............+......+.......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.........+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+..+......+....+...+.....+...+...+......+....+.....+.......+...+..+...............+....+...+..+....+.....+......+...+..........+.....+...+...+.........+...+....+........+............+.+..+..........+..+.........+.......+...+.....+..........+.........+..+....+..+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Common Name (eg: your user, host, or server name) [Easy-RSA CA]:
+
+Notice
+------
+CA creation complete. Your new CA certificate is at:
+* /home/rosa/easy-rsa/easyrsa3/pki/ca.crt
+----
+
+. Generate the Server Certificate and Key (type `yes` when prompted)
++
+[source,sh]
+----
+./easyrsa build-server-full server nopass
+----
++
+.Sample Output
+[source,texinfo,options=nowrap]
+----
+Using Easy-RSA 'vars' configuration:
+* /home/rosa/easy-rsa/easyrsa3/pki/vars
+
+Using SSL:
+* openssl OpenSSL 3.0.7 1 Nov 2022 (Library: OpenSSL 3.0.7 1 Nov 2022)
+...+.........+.......+..+...+.............+............+..+......+.+...+..+..........+......+..+.+..+....+........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..+.....+.+..+....+......+...+..+.......+...+..............+...+.+.........+..+.+........+............+...+............+..................+.+......+...+..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*......+......+.+...+............+.....+.......+..+....+.....+....+..+...+.......+........+...+....+.....................+.........+........+.+..+...+.+...............+......+........+....+...+...+......+.....+....+..+........................+...............+...+.............+........+...................+.....+............+...+...+..........+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+.+......+.....+..........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*......+...............+.+.....+......+.+........+.+...........+...+.........+...+.......+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..+....+...+...+.........+...+..+.........+......+....+..+.......+...+.............................+..........+........+.+.....+....+............+......+...+.....+.+...........+....+........+...+...+............+.........+...............+...+.+...............+.....+....+...+..+......+......+.+..............+.........+.+.....+....+.....+......+.+.....+.......+...............+...+..+.......+...+..+.+........+.+......+...+..+...+.........+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----
+
+Notice
+------
+Private-Key and Public-Certificate-Request files created.
+Your files are:
+* req: /home/rosa/easy-rsa/easyrsa3/pki/reqs/server.req
+* key: /home/rosa/easy-rsa/easyrsa3/pki/private/server.key
+
+You are about to sign the following certificate:
+Request subject, to be signed as a server certificate
+for '825' days:
+
+subject=
+    commonName                = server
+
+Type the word 'yes' to continue, or any other input to abort.
+  Confirm request details: yes
+
+Using configuration from /home/rosa/easy-rsa/easyrsa3/pki/openssl-easyrsa.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+commonName            :ASN.1 12:'server'
+Certificate is to be certified until Nov  5 15:19:56 2025 GMT (825 days)
+
+Write out database with 1 new entries
+Data Base Updated
+
+Notice
+------
+Certificate created at:
+* /home/rosa/easy-rsa/easyrsa3/pki/issued/server.crt
+
+Notice
+------
+Inline file created:
+* /home/rosa/easy-rsa/easyrsa3/pki/inline/server.inline
+----
+
+. Generate Diffie-Hellman (DH) parameters
++
+[source,sh]
+----
+./easyrsa gen-dh
+----
++
+.Sample Output
+[source,texinfo,options=nowrap]
+----
+Using Easy-RSA 'vars' configuration:
+* /home/rosa/easy-rsa/easyrsa3/pki/vars
+
+Using SSL:
+* openssl OpenSSL 3.0.7 1 Nov 2022 (Library: OpenSSL 3.0.7 1 Nov 2022)
+Generating DH parameters, 2048 bit long safe prime
+.....................................................+.....................................................................................................................................................................................................................................................+.....................................+.............................................................................................................+............................................................................+............................................................................................................................................+..............................................................+........................................................................................................+.............................................................................................................................................................................................................................................................+..........+.............................................................................+.............................................................................................................................................................+...............................................................+..................+..................................................................................+......................+.......................+........................................................................................................+....................................................................................................................................................................................+.......................................................................................................+......................................................................................................................................................................................................................................................+.....................................................................++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*
+DH parameters appear to be ok.
+
+Notice
+------
+
+DH parameters of size 2048 created at:
+* /home/rosa/easy-rsa/easyrsa3/pki/dh.pem
+----
+
+. Generate client credentials (type `yes` when prompted)
++
+[source,sh]
+----
+./easyrsa build-client-full aws nopass
+----
++
+.Sample Output
+[source,texinfo,options=nowrap]
+----
+Using Easy-RSA 'vars' configuration:
+* /home/rosa/easy-rsa/easyrsa3/pki/vars
+
+Using SSL:
+* openssl OpenSSL 3.0.7 1 Nov 2022 (Library: OpenSSL 3.0.7 1 Nov 2022)
+..+..+.......+...........+.+.....+.........+....+.....+.+.........+..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*...+......+...+......+.+........+.+.........+.....+.......+.........+...+.....+......+....+.....+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.................+.....+......+....+.........+..+......+...+....+...........+....+..+.+........+......+..................+.......+...+........+............+...............+.+..+....+......+..+......+.+........+......+..........+.....+.+...+..+.........+.+...+......+..+..........+..+................+..+..........+.........+...+..+..........+.........+..+............+......+.+.....+................+...+..............+...+...+.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+.....+......+....+...+.....+.+.....+....+...........+.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+......+.........+..+...+.+......+......+.....+.......+..+....+.....+.+.....+...+...+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+.......+..+...+.......+........+......+....+...+........+.+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----
+
+Notice
+------
+Private-Key and Public-Certificate-Request files created.
+Your files are:
+* req: /home/rosa/easy-rsa/easyrsa3/pki/reqs/aws.req
+* key: /home/rosa/easy-rsa/easyrsa3/pki/private/aws.key
+
+You are about to sign the following certificate:
+Request subject, to be signed as a client certificate
+for '825' days:
+
+subject=
+    commonName                = aws
+
+Type the word 'yes' to continue, or any other input to abort.
+  Confirm request details: yes
+
+Using configuration from /home/rosa/easy-rsa/easyrsa3/pki/openssl-easyrsa.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+commonName            :ASN.1 12:'aws'
+Certificate is to be certified until Nov  5 15:21:30 2025 GMT (825 days)
+
+Write out database with 1 new entries
+Data Base Updated
+
+Notice
+------
+Certificate created at:
+* /home/rosa/easy-rsa/easyrsa3/pki/issued/aws.crt
+
+Notice
+------
+Inline file created:
+* /home/rosa/easy-rsa/easyrsa3/pki/inline/aws.inline
+----
+
+. Set environment variables for the CA certificate you just created.
++
+[source,sh]
+----
+CACERT=$(openssl x509 -in pki/ca.crt -outform der | base64)
+----
+
+== Import certficates into AWS Certificate Manager
+
+. Import the server certificate into AWS
++
+[source,sh]
+----
+SERVER_CERT_ARN=$(aws acm import-certificate \
+--certificate fileb://${HOME}/easy-rsa/easyrsa3/pki/issued/server.crt \
+--private-key fileb://${HOME}/easy-rsa/easyrsa3/pki/private/server.key \
+--certificate-chain fileb://${HOME}/easy-rsa/easyrsa3/pki/ca.crt \
+--region ${PL_REGION} \
+--query CertificateArn \
+--output text)
+
+echo ${SERVER_CERT_ARN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+arn:aws:acm:us-west-1:858858614682:certificate/91c3a670-1bc6-4c90-bb6c-e35105f91c5c
+----
+
+. Import the client certificate into AWS
++
+[source,sh]
+----
+CLIENT_CERT_ARN=$(aws acm import-certificate \
+--certificate fileb://${HOME}/easy-rsa/easyrsa3/pki/issued/aws.crt \
+--private-key fileb://${HOME}/easy-rsa/easyrsa3/pki/private/aws.key \
+--certificate-chain fileb://${HOME}/easy-rsa/easyrsa3/pki/ca.crt \
+--region ${PL_REGION} \
+--query CertificateArn \
+--output text)
+
+echo ${CLIENT_CERT_ARN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+arn:aws:acm:us-west-1:858858614682:certificate/629b8a31-65fd-4613-8287-130076dc5754
+----
+
+== Create a Client VPN Endpoint
+
+. Retrieve the VPN Client ID
++
+[source,sh]
+----
+VPN_CLIENT_ID=$(aws ec2 create-client-vpn-endpoint \
+  --region ${PL_REGION} \
+  --client-cidr-block ${VPN_CLIENT_CIDR} \
+  --server-certificate-arn ${SERVER_CERT_ARN} \
+  --authentication-options Type=certificate-authentication,MutualAuthentication={ClientRootCertificateChainArn=$CLIENT_CERT_ARN} \
+  --connection-log-options Enabled=false --split-tunnel --query ClientVpnEndpointId --output text)
+
+echo ${VPN_CLIENT_ID}
+----
++
+.Sample Output
+[source,texinfo]
+----
+cvpn-endpoint-0542d56de182c6052
+----
+
+. Associate each private subnet with the client VPN endpoint
++
+[source,sh]
+----
+aws ec2 associate-client-vpn-target-network \
+  --region ${PL_REGION} \
+  --subnet-id ${PL_PRIVATE_SUBNET} \
+  --client-vpn-endpoint-id ${VPN_CLIENT_ID}
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "AssociationId": "cvpn-assoc-00a7e67e24418292e",
+    "Status": {
+        "Code": "associating"
+    }
+}
+----
+
+. Add an ingress authorization rule to a Client VPN endpoint
++
+[source,sh]
+----
+aws ec2 authorize-client-vpn-ingress \
+  --region ${PL_REGION} \
+  --client-vpn-endpoint-id ${VPN_CLIENT_ID} \
+  --target-network-cidr 0.0.0.0/0 \
+  --authorize-all-groups
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "Status": {
+        "Code": "authorizing"
+    }
+}
+----
+
+== Configure your OpenVPN Client
+
+. Download the VPN Client Configuration
++
+[source,sh]
+----
+aws ec2 export-client-vpn-client-configuration \
+  --region ${PL_REGION} \
+  --client-vpn-endpoint-id ${VPN_CLIENT_ID} \
+  --output text > ${HOME}/${PL_CLUSTER_NAME}.ovpn
+----
+
+. Run the following commands to add the certificates created in the first step to the VPN Configuration file.
+
+note: make sure you are still in the easy rsa / pki directory.
++
+[source,sh]
+----
+echo '<cert>' >> ${HOME}/${PL_CLUSTER_NAME}.ovpn
+
+openssl x509 -in ${HOME}/easy-rsa/easyrsa3/pki/issued/aws.crt >> ${HOME}/${PL_CLUSTER_NAME}.ovpn
+
+echo '</cert>' >> ${HOME}/${PL_CLUSTER_NAME}.ovpn
+
+echo '<key>' >> ${HOME}/${PL_CLUSTER_NAME}.ovpn
+
+cat ${HOME}/easy-rsa/easyrsa3/pki/private/aws.key >> ${HOME}/${PL_CLUSTER_NAME}.ovpn
+
+echo '</key>' >> ${HOME}/${PL_CLUSTER_NAME}.ovpn
+----
+
+. Double check your OpenVPN config file. It should look similar to the examble below:
++
+[source,sh]
+----
+cat ${HOME}/${PL_CLUSTER_NAME}.ovpn
+----
++
+.Sample Output
+[source,texinfo]
+----
+client
+dev tun
+proto udp
+remote cvpn-endpoint-0542d56de182c6052.prod.clientvpn.us-west-1.amazonaws.com 443
+remote-random-hostname
+resolv-retry infinite
+nobind
+remote-cert-tls server
+cipher AES-256-GCM
+verb 3
+<ca>
+-----BEGIN CERTIFICATE-----
+MIIDSzCCAjOgAwIBAgIUQTC+QioKYxZTRpxBBYkD1GVw4w4wDQYJKoZIhvcNAQEL
+
+[... Output Omitted...]
+
+JArAWVZMG3xpx3zr8MmteesgCwTp+b9+7yRcGrK1Vw==
+-----END CERTIFICATE-----
+
+</ca>
+
+
+reneg-sec 0
+
+verify-x509-name server name
+<cert>
+-----BEGIN CERTIFICATE-----
+MIIDUTCCAjmgAwIBAgIQYXITBcLCYYcoqhXzGZP3ozANBgkqhkiG9w0BAQsFADAW
+
+[... Output Omitted...]
+
+ExQ9VZVyMoxoFTq1exZCR5pY0PGJiVnnEj2N33DMAkbq0TcCIg==
+-----END CERTIFICATE-----
+</cert>
+<key>
+-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDPGUl4pNp8g5hM
+
+[... Output Omitted...]
+
+oqOcsVoatIt7kDAPtz0K+1Md0g==
+-----END PRIVATE KEY-----
+</key>
+----
+
+. Add DNS Entries: In order to resolve the ROSA Cluster domain name, you will need to either add the DNS server and the Route 53 Hosted Domain for the cluster to your VPN settings or /etc/hosts in machine you are connecting from.
++
+The DNS server will be the `x.x.x.2`` address of your VPC CIDR. For example, if you VPC CIDR is `10.66.0.0/16` then your DNS server will be `10.66.0.2`.
++
+You can find the VPC ( machine ) CIDR with this command:
++
+[source,sh]
+----
+rosa describe cluster \
+  -c ${PL_CLUSTER_NAME} \
+  -o json | jq -r '.network.machine_cidr'
+----
++
+.Sample Output
+[source,texinfo]
+----
+10.0.0.0/16
+----
++
+This means that the DNS server would be `10.0.0.2`.
+
+. You can find the ROSA base domain with this command:
++
+[source,sh]
+----
+rosa describe cluster \
+  -c ${PL_CLUSTER_NAME} \
+  -o json | jq -r '.dns.base_domain'
+----
++
+.Sample Output
+[source,texinfo]
+----
+67s3.p1.openshiftapps.com
+----
+
+. Import the `${PL_CLUSTER_NAME}.ovpn` file into your VPN Software.
++
+*macOS*: just double click the `${PL_CLUSTER_NAME}.ovpn` and it will be imported automatically into your VPN client.
+
+. Update the DNS settings for the VPN connection with the DNS Server and base domain that you retrieved before.
++
+.Example
+image::media/vpn-dns-settings.png[width=80%]
+
+. Connect your VPN.
++
+image::../media/vpn-connected.png[width=80%]
+
+. Connect to the OpenShift Console.
++
+If you need to remind yourself of the console URL:
++
+[source,sh]
+----
+rosa describe cluster \
+  -c ${PL_CLUSTER_NAME} \
+  -o json | jq -r '.console.url'
+----
++
+.Sample Output
+[source,texinfo]
+----
+https://console-openshift-console.apps.pl-sts-hfw79.aano.p1.openshiftapps.com
+----
+
+You should be able to reach this URL now when connected to the VPN. And you should be able to use the `cluster-admin` credentials (if you created them earlier) to log into the cluster.

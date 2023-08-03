@@ -51,7 +51,7 @@ PL_VERSION=4.13.4
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 AWS_PAGER=""
 
-rm ${HOME}/variables
+touch ${HOME}/variables
 echo "export PL_CLUSTER_NAME=${PL_CLUSTER_NAME}" >>${HOME}/variables
 echo "export PL_REGION=${PL_REGION}" >>${HOME}/variables
 echo "export PL_VERSION=${PL_VERSION}" >>${HOME}/variables
@@ -462,7 +462,7 @@ The AWS Security Token Service (STS) allows us to deploy ROSA without needing a 
 
 This is a summary of the official OpenShift docs that can be used as a line by line install guide.
 
-// Note that some commands (OIDC for STS) will be hard coded to US-EAST-1, do not be tempted to change these to use $PL_region instead or you will fail installation.
+// Note that some commands (OIDC for STS) will be hard coded to US-EAST-1, do not be tempted to change these to use $PL_REGION instead or you will fail installation.
 
 . Create the IAM Account Roles
 +
@@ -480,17 +480,15 @@ I: AWS credentials are valid!
 I: Validating AWS quota...
 I: AWS quota ok. If cluster installation fails, validate actual AWS resource usage against https://docs.openshift.com/rosa/rosa_getting_started/rosa-required-aws-service-quotas.html
 I: Verifying whether OpenShift command-line tool is available...
-I: Current OpenShift Client Version: 4.13.5
+I: Current OpenShift Client Version: 4.13.6
 I: Creating account roles
-I: Creating roles using 'arn:aws:iam::870651848115:user/wkulhane@redhat.com-szrxx'
-I: Created role 'ManagedOpenShift-Installer-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-Installer-Role'
-I: Created role 'ManagedOpenShift-ControlPlane-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-ControlPlane-Role'
-I: Created role 'ManagedOpenShift-Worker-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-Worker-Role'
-I: Created role 'ManagedOpenShift-Support-Role' with ARN 'arn:aws:iam::870651848115:role/ManagedOpenShift-Support-Role'
+I: Creating classic account roles using 'arn:aws:iam::858858614682:user/wkulhane@redhat.com-d4lf4'
+I: Created role 'ManagedOpenShift-Installer-Role' with ARN 'arn:aws:iam::858858614682:role/ManagedOpenShift-Installer-Role'
+I: Created role 'ManagedOpenShift-ControlPlane-Role' with ARN 'arn:aws:iam::858858614682:role/ManagedOpenShift-ControlPlane-Role'
+I: Created role 'ManagedOpenShift-Worker-Role' with ARN 'arn:aws:iam::858858614682:role/ManagedOpenShift-Worker-Role'
+I: Created role 'ManagedOpenShift-Support-Role' with ARN 'arn:aws:iam::858858614682:role/ManagedOpenShift-Support-Role'
 I: To create an OIDC Config, run the following command:
 	rosa create oidc-config
-I: To create a cluster with these roles, run the following command:
-	rosa create cluster --sts
 ----
 
 == Deploy ROSA cluster
@@ -563,7 +561,6 @@ I: Created role 'pl-sts-szrxx-f3e4-openshift-cluster-csi-drivers-ebs-cloud-crede
 [source,sh,role=copy]
 ----
 rosa create oidc-provider \
-  --region ${PL_REGION} \
   --cluster ${PL_CLUSTER_NAME} \
   --mode auto \
   --yes
@@ -598,7 +595,11 @@ rosa logs install --cluster ${PL_CLUSTER_NAME} --watch
 
 == Validate the cluster
 
-Once the cluster has finished installing it is time to validate. Validation when using Private Link requires the use of a jump host.
+Once the cluster has finished installing it is time to validate.
+
+Validation when using Private Link requires the use of a jump host or set up of a VPN (see the VPN module for how to do that).
+
+In this lab you will continue by setting up a jumphost.
 
 . Create a jumphost instance using the AWS CLI
 
@@ -695,7 +696,7 @@ aws ec2 create-key-pair \
 chmod 600 ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem
 ----
 
-.. Determine the AMI ID to use for your jump host and store it in PL_AMI_ID
+.. Determine the AMI ID to use for your jumphost and store it in PL_AMI_ID
 +
 [source,sh,role=copy]
 ----
@@ -762,14 +763,14 @@ This instance will be associated with a Public IP directly.
 +
 [source,sh,role=copy]
 ----
-export IP_JUMPBOX=$(aws ec2 describe-instances \
+export IP_JUMPHOST=$(aws ec2 describe-instances \
   --region ${PL_REGION} \
   --filters "Name=tag:Name,Values=${PL_TAG_VM}" \
   | jq -r '.Reservations[0].Instances[0].PublicIpAddress')
 
-echo "export IP_JUMPBOX=${IP_JUMPBOX}" >>${HOME}/variables
+echo "export IP_JUMPHOST=${IP_JUMPHOST}" >>${HOME}/variables
 
-echo ${IP_JUMPBOX}
+echo ${IP_JUMPHOST}
 ----
 +
 .Sample Output
@@ -778,14 +779,14 @@ echo ${IP_JUMPBOX}
 54.153.92.19
 ----
 
-.. Test connecting to your jumpbox
+.. Test connecting to your jumphost
 +
 [source,sh,role=copy]
 ----
-ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem ec2-user@${IP_JUMPBOX}
+ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem ec2-user@${IP_JUMPHOST}
 ----
 
-.. Log back out of your jumpbox (`Ctrl-d`)
+.. Log back out of your jumphost (`Ctrl-d`)
 
 . Create a ROSA admin user and save the login command for use later
 +
@@ -822,7 +823,7 @@ API URL:                    https://api.pl-sts-szrxx.93vg.p1.openshiftapps.com:6
 Console URL:                https://console-openshift-console.apps.pl-sts-szrxx.93vg.p1.openshiftapps.com
 ----
 
-. Set variable PL_BASE_DOMAIN
+. Set variable `PL_BASE_DOMAIN`
 +
 [source,sh,role=copy]
 ----
@@ -842,8 +843,7 @@ echo "
 " >>/etc/hosts
 ----
 
-. SSH to your jumpbhost instance, tunneling traffic for the appropriate hostnames. Be sure to use your new/existing private key, the OpenShift DNS for $YOUR_OPENSHIFT_DNS and your jump host IP for $YOUR_EC2_IP
-
+. SSH to your jumphost instance, tunneling traffic for the appropriate hostnames. Be sure to use your new/existing private key, the OpenShift DNS for $YOUR_OPENSHIFT_DNS and your jumphost IP for ${YOUR_EC2_IP}
 +
 [source,sh,role=copy]
 ----
@@ -851,7 +851,7 @@ sudo ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem \
   -L 6443:api.${PL_BASE_DOMAIN}:6443 \
   -L 443:console-openshift-console.apps.${PL_BASE_DOMAIN}:443 \
   -L 80:console-openshift-console.apps.${PL_BASE_DOMAIN}:80 \
-  ec2-user@${IP_JUMPBOX}
+  ec2-user@${IP_JUMPHOST}
 ----
 
 . With the SSH connection active open another terminal window to your bastion VM.

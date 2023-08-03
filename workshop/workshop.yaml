@@ -24,6 +24,7 @@ modules:
   - 400-service-mesh/lab_18_service_mesh_deploy_app
   - 400-service-mesh/lab_19_service_mesh_observe
   - 100-setup/lab_x_cluster_creation_private_link
+  - 200-ops/lab_x_configure_vpn_access_to_privatelink
   - 200-ops/lab_x_configure_idp_cognito
   - 200-ops/lab_x_configure_efs_csi_driver
   - 200-ops/lab_x_configure_rosa_ecr

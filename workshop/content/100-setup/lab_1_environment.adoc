@@ -51,8 +51,8 @@ rosa version
 .Sample Output
 [source,texinfo]
 ----
-1.2.23
-Your ROSA CLI is up to date.
+1.2.24
+I: Your ROSA CLI is up to date.
 ----
 
 . Verify that the `aws` command line tool is installed:
@@ -65,7 +65,7 @@ aws --version
 .Sample Output
 [source,text,options=nowrap]
 ----
-aws-cli/2.13.3 Python/3.11.4 Linux/4.18.0-305.88.1.el8_4.x86_64 exe/x86_64.rhel.8 prompt/off
+aws-cli/2.13.6 Python/3.11.4 Linux/5.14.0-284.25.1.el9_2.x86_64 exe/x86_64.rhel.9 prompt/off
 ----
 
 . Verify that the `aws` command line tool is configured correctly:
@@ -96,7 +96,7 @@ rosa verify openshift-client
 [source,texinfo,options=nowrap]
 ----
 I: Verifying whether OpenShift command-line tool is available...
-I: Current OpenShift Client Version: 4.13.5
+I: Current OpenShift Client Version: 4.13.6
 ----
 
 . Rosa login
@@ -129,16 +129,16 @@ rosa whoami
 .Sample Output
 [source,texinfo]
 ----
-AWS ARN:                      arn:aws:iam::950629760808:user/wkulhane@redhat.com-nhnv4
-AWS Account ID:               950629760808
+AWS ARN:                      arn:aws:iam::<redacted>:user/wkulhane@redhat.com-nhnv4
+AWS Account ID:               <redacted>
 AWS Default Region:           us-east-2
 OCM API:                      https://api.openshift.com
 OCM Account Email:            rhpds-admins+cloud@redhat.com
-OCM Account ID:               1z8aXAxD3PWdlWiNRIE588rHD9l
+OCM Account ID:               <redacted>
 OCM Account Name:             RHPDS Cloud
 OCM Account Username:         rhpds-cloud
-OCM Organization External ID: 15324659
-OCM Organization ID:          1z8aXAQ73DYAPLeCZhNq1MRQ0ZL
+OCM Organization External ID: <redacted>
+OCM Organization ID:          <redacted>
 OCM Organization Name:        Red Hat, Inc.
 ----
 

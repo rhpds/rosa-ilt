@@ -1,10 +1,16 @@
-= CICD
-
+== Introduction
 // To be updated using something else but GitHub. E.g. Gitea.
+OpenShift Pipelines is a cloud-native, continuous integration and continuous delivery (CI/CD) solution based on Kubernetes resources. It uses Tekton building blocks to automate deployments across multiple platforms by abstracting away the underlying implementation details. Tekton introduces a number of standard Custom Resource Definitions (CRDs) for defining CI/CD pipelines that are portable across Kubernetes distributions. Some key features of OpenShift Pipelines include:
 
-Next, we'll automate deploying our application using the OpenShift Pipelines operator, which is based on the open source Tekton project.
+* OpenShift Pipelines is a serverless CI/CD system that runs Pipelines with all the required dependencies in isolated containers.
+* OpenShift Pipelines are designed for decentralized teams that work on microservice-based architecture.
+* OpenShift Pipelines use standard CI/CD pipeline definitions that are easy to extend and integrate with the existing Kubernetes tools, enabling you to scale on-demand.
+* You can use OpenShift Pipelines to build images with Kubernetes tools such as Source-to-Image (S2I), Buildah, Buildpacks, and Kaniko that are portable across any Kubernetes platform.
+* You can use the OpenShift Container Platform Developer Console to create Tekton resources, view logs of Pipeline runs, and manage pipelines in your OpenShift Container Platform namespaces.
 
 If you would like to read more about OpenShift Pipelines, https://docs.openshift.com/container-platform/4.13/cicd/pipelines/understanding-openshift-pipelines.html[see the Red Hat documentation].
+
+== Install the OpenShift Pipelines operator
 
 [WARNING]
 ====
@@ -12,8 +18,6 @@ If you would like to read more about OpenShift Pipelines, https://docs.openshift
 
 This section of the workshop requires a personal https://github.com[GitHub] account. If you do not have a GitHub account and do not wish to create one, you can skip this section and move to the next section.
 ====
-
-== Install the OpenShift Pipelines operator
 
 . Return to your tab with the OpenShift Web Console.
 . Using the menu on the left select *Operator \-> OperatorHub*.
@@ -75,7 +79,7 @@ export GH_USER=replaceme
 . Next, we'll create a new working directory to clone our forked GitHub repositories.
 To do so, run the following commands:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 mkdir ~/gitops
 
@@ -93,7 +97,7 @@ These common tasks are designed to be reused across multiple pipelines.
 
 . Switch back to the `microsweeper-ex` project from earlier:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc project microsweeper-ex
 ----
@@ -101,7 +105,7 @@ oc project microsweeper-ex
 . Let's start by taking a look at the reusable tasks that we will be using.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 ls ~/gitops/rosa-workshop-app/pipeline/tasks/*.yaml
 ----
@@ -128,7 +132,7 @@ It uses Buildah's support for building from Dockerfiles, using its buildah bud c
 . Next, we need to apply all of these tasks to our cluster.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc apply -n microsweeper-ex -f \
   ~/gitops/rosa-workshop-app/pipeline/tasks
@@ -149,7 +153,7 @@ task.tekton.dev/update-deployment created
 . Next, create the pipeline service account and permissions that the pipeline tasks will run under.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc create -f ~/gitops/rosa-workshop-app/pipeline/1-pipeline-account.yaml
 ----
@@ -165,7 +169,7 @@ rolebinding.rbac.authorization.k8s.io/pipeline-role-binding created
 . We also need to give the pipeline permission for certain privileged security context constraints to that it can execute builds.
 To grant these permissions, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n microsweeper-ex adm policy add-scc-to-user anyuid -z pipeline
 oc -n microsweeper-ex adm policy add-scc-to-user privileged -z pipeline
@@ -174,7 +178,7 @@ oc -n microsweeper-ex adm policy add-scc-to-user privileged -z pipeline
 . Create a persistent volume claim that the pipeline will use to store build images.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc create -f ~/gitops/rosa-workshop-app/pipeline/2-pipeline-pvc.yaml
 ----
@@ -191,7 +195,7 @@ The pipeline definition simply says which order the tasks are run and what param
 . Now that we have the source code forked, we need to copy the properties file we created in the previous section to our new code base.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cp ~/rosa-workshop-app/src/main/resources/application.properties \
    ~/gitops/rosa-workshop-app/src/main/resources/application.properties
@@ -200,7 +204,7 @@ cp ~/rosa-workshop-app/src/main/resources/application.properties \
 . Next, let's configure our Git CLI.
 To do so, run the following commands:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 git config --global user.email "${GH_USER}@github.io"
 git config --global user.name "${GH_USER}"
@@ -209,7 +213,7 @@ git config --global user.name "${GH_USER}"
 . Finally, let's commit our changes to GitHub.
 To do so, run the following set of commands:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cd ~/gitops/rosa-workshop-app
 
@@ -225,7 +229,7 @@ git push
 . In addition, let's go ahead and create a secret with our GitHub credentials that we will need later.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cat << EOF | oc apply -f -
 ---
@@ -246,7 +250,7 @@ EOF
 . Now let's proceed with creating our pipeline definition.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc create -f ~/gitops/rosa-workshop-app/pipeline/3-pipeline.yaml
 ----
@@ -254,7 +258,7 @@ oc create -f ~/gitops/rosa-workshop-app/pipeline/3-pipeline.yaml
 . Finally, we will create a pipeline run that will execute the pipeline, pull the code from your forked GitHub repositories, build the image, and deploy it to ROSA.
 To do this, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cat << EOF | oc create -f -
 ---
@@ -326,7 +330,7 @@ We can do so with an Event Listener and a Trigger.
 
 . Let's start by looking at the resources we will be creating to create our event listener and trigger.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 ls ~/gitops/rosa-workshop-app/pipeline/tasks/event-listener/*.yaml
 ----
@@ -369,7 +373,7 @@ To learn more about EventListeners, https://tekton.dev/docs/triggers/eventlisten
 . Next, let's update our web trigger template with your GitHub username.
 To do this, let's run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 sed -i "s/GITHUB_USER_ID/${GH_USER}/g" \
   ~/gitops/rosa-workshop-app/pipeline/tasks/event-listener/2-web-trigger-template.yaml
@@ -377,7 +381,7 @@ sed -i "s/GITHUB_USER_ID/${GH_USER}/g" \
 
 . Now that you have reviewed all the files, let's apply them to our cluster.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n microsweeper-ex create -f \
   ~/gitops/rosa-workshop-app/pipeline/tasks/event-listener
@@ -403,14 +407,14 @@ When an action, such as a git push, happens, git will need to call our EventList
 . First we need to do is expose our EventListener service to the internet.
 To do so, we'll run the `oc expose` command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n microsweeper-ex expose svc el-minesweeper-el
 ----
 
 . To get the URL of the Event Listener Route that we just created, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n microsweeper-ex get route el-minesweeper-el \
    -o jsonpath="http://{.spec.host}{'\n'}"
@@ -476,7 +480,7 @@ Now that we have our trigger, eventlistener and git webhook setup, lets test it 
 
 . Search for Leaderboard and change it to <YOUR NAME> Leaderboard.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cd ~/gitops/rosa-workshop-app
 vim src/main/resources/META-INF/resources/index.html
@@ -486,7 +490,7 @@ image::../media/html-edit.png[Image]
 
 . Now commit and push the change:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 git commit -am 'Updated leaderboard title'
 git push
@@ -503,6 +507,17 @@ From the OpenShift Web Console, click on _Networking_ \-> _Routes_.
 +
 image:../media/route-2.png[Image]
 
-. Hopefully, you will see the updated application with a new title for the leaderboard!
+. You should see the updated application with a new title for the leaderboard!
 +
 image:../media/updated-minesweeper.png[Image]
+
+Congratulations! You've successfully installed OpenShift Pipelines and used it to deploy an application.
+
+== Summary
+
+Here's what you learned:
+
+* How to install and configure OpenShift Pipelines.
+* How to import Pipeline tasks.
+* How to configure and validate a Pipeline.
+* How to trigger build based on Git events.

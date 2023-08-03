@@ -23,7 +23,7 @@ Use `rosa list instance-types` to list the available ROSA instance types.
 Use `aws ec2 describe-instance-type-offerings` to check that your desired AZ supports your desired instance type.
 
 Example using us-west-1, us-west-1a, and m5a.xlarge:  
-+
+
 [source,sh,role=copy]
 ----
 aws ec2 describe-instance-type-offerings --location-type availability-zone \
@@ -31,13 +31,13 @@ aws ec2 describe-instance-type-offerings --location-type availability-zone \
   --filters Name=location,Values=us-west-1a \
   --output text | egrep m5a.xlarge
 ----
-+
+
 .Sample Output
 [source,texinfo]
 ----
 INSTANCETYPEOFFERINGS	m5a.xlarge	us-west-1a	availability-zone
 ----
-+
+
 The result should display `INSTANCETYPEOFFERINGS [instance-type] [az] availability-zone` if your selected region supports your desired instance type (like in the example above.)
 
 . Configure the following environment variables:
@@ -580,7 +580,7 @@ I: Created OIDC provider with ARN 'arn:aws:iam::870651848115:oidc-provider/rh-oi
 +
 [source,sh,role=copy]
 ----
-watch "rosa describe cluster --cluster ${PL_CLUSTER_NAME} | grep State"
+watch -n 10 "rosa describe cluster --cluster ${PL_CLUSTER_NAME} | grep State"
 ----
 +
 .Sample Output

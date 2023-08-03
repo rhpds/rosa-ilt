@@ -2,24 +2,24 @@
 modules:
   index:
     name: Introduction
-    exit_sign: Environment
+    exit_sign: Environment Setup
   100-setup/lab_1_environment:
-    name: Environment
-    exit_sign: Deploy ROSA cluster
+    name: Environment Setup
+    exit_sign: Continue
   100-setup/lab_2a_cluster_creation:
-    name: Deploy ROSA cluster
-    exit_sign: Deploy ROSA cluster (HCP)
+    name: Deploy a ROSA cluster
+    exit_sign: Continue
   100-setup/lab_2b_cluster_creation_hcp:
-    name: Deploy ROSA cluster (HCP)
-    exit_sign: Create admin user
+    name: Deploy a ROSA cluster (HCP)
+    exit_sign: Continue
   100-setup/lab_3_create_admin-user:
-    name: Create admin user
-    exit_sign: Configure IDP (Red Hat SSO)
+    name: Create Admin User
+    exit_sign: Continue
   200-ops/lab_4_configure_idp_keycloak:
-    name: Configure IDP (Red Hat SSO)
+    name: Configure Cluster Authentication using Red Hat SSO
     exit_sign: Continue
   200-ops/lab_5_cluster_upgrades:
-    name: Cluster Upgrades
+    name: Managing Cluster Upgrades
     exit_sign: Continue
   200-ops/lab_6_managing_worker_nodes:
     name: Managing Worker Nodes
@@ -31,7 +31,7 @@ modules:
     name: Labeling Nodes
     exit_sign: Continue
   200-ops/lab_9_cloudwatch:
-    name: Configure Log Forwarding to Cloudwatch
+    name: Log Forwarding to AWS Cloudwatch
     exit_sign: Continue
   300-apps/lab_10_deploy_app:
     name: Deploy an Application
@@ -46,7 +46,7 @@ modules:
     name: Automate Deploying the App using OpenShift Pipelines
     exit_sign: Continue
   300-apps/lab_14_resilient_app:
-    name: Making your application resilient
+    name: Making your Application Resilient
     exit_sign: Continue
   400-service-mesh/lab_15_service_mesh_introduction:
     name: Introduction to OpenShift Service Mesh
@@ -55,7 +55,7 @@ modules:
     name: Deploy Service Mesh Operator
     exit_sign: Continue
   400-service-mesh/lab_17_service_mesh_deploy_control_plane:
-    name: Deploy Control Plane
+    name: Deploy Service Mesh Control Plane
     exit_sign: Continue
   400-service-mesh/lab_18_service_mesh_deploy_app:
     name: Deploy Workloads
@@ -65,6 +65,9 @@ modules:
     exit_sign: Exit
   100-setup/lab_x_cluster_creation_private_link:
     name: Create Cluster with PrivateLink
+    exit_sign: Exit
+  200-ops/200-ops/lab_x_configure_idp_cognito:
+    name: Configure Cluster Authentication Using Amazon Cognito
     exit_sign: Exit
   200-ops/lab_x_configure_efs_csi_driver:
     name: Configure EFS CSI Driver

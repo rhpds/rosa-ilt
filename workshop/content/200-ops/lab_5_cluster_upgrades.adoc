@@ -1,16 +1,12 @@
 == Introduction
 
-Red Hat OpenShift Service on AWS (ROSA) provides fully-managed cluster upgrades.
-These upgrades can be scheduled from the OpenShift Cluster Manager or from the ROSA CLI.
-All upgrades are monitored and managed by the Red Hat ROSA SRE team.
+Red Hat OpenShift Service on AWS (ROSA) provides fully-managed cluster upgrades. The ROSA Site Reliability Engineering (SRE) Team will monitor and manage all ROSA cluster upgrades. Customers get status emails from the SRE team before, during, and after the upgrade. These updates can be scheduled from the OpenShift Cluster Manager (OCM) or from the ROSA CLI.
 
-For more information on how ROSA's Upgrade Service works, please see the https://docs.openshift.com/rosa/upgrading/rosa-upgrading-sts.html[Red Hat documentation].
+During ROSA upgrades, one node is upgraded at a time. This is done to ensure customer applications are not impacted during the update, when deployed in a highly-available and fault-tolerant method.
+
+There are two ways to upgrade a ROSA cluster - using OpenShift Cluster Manager or using the `rosa` CLI. In this lab environment we do not have access to the OpenShift Cluster Manager so we will use the `rosa` CLI.
 
 == Upgrade using the `rosa` command line interface
-
-There are two ways to upgrade a ROSA cluster - using OpenShift Cluster Manager or using the `rosa` CLI.
-
-In this lab environment you do not have access to the OpenShift Cluster Manager so we have to you the CLI.
 
 . Remind yourself of the version of your cluster:
 +
@@ -22,10 +18,10 @@ oc version
 .Sample Output
 [source,text,options=nowrap]
 ----
-Client Version: 4.13.5
+Client Version: 4.13.4
 Kustomize Version: v4.5.7
-Server Version: 4.13.3
-Kubernetes Version: v1.26.5+7a891f0
+Server Version: 4.13.4
+Kubernetes Version: v1.26.3+b404935
 ----
 
 . Find out the available versions:
@@ -38,20 +34,26 @@ oc adm upgrade
 .Sample Output
 [source,text,options=nowrap]
 ----
-Cluster version is 4.13.4
+Cluster version is 4.13.0
 
 Upgradeable=False
 
-  Reason: MissingUpgradeableAnnotation
-  Message: Cluster operator cloud-credential should not be upgraded between minor versions: Upgradeable annotation cloudcredential.openshift.io/upgradeable-to on cloudcredential.operator.openshift.io/cluster object needs updating before upgrade. See Manually Creating IAM documentation for instructions on preparing a cluster for upgrade.
+  Reason: MultipleReasons
+  Message: Cluster should not be upgraded between minor versions for multiple reasons: AdminAckRequired,MissingUpgradeableAnnotatio
+n
+  * Kubernetes 1.26 and therefore OpenShift 4.13 remove several APIs which require admin consideration. Please see the knowledge ar
+ticle https://access.redhat.com/articles/6958394 for details and instructions.
+  * Cluster operator cloud-credential should not be upgraded between minor versions: Upgradeable annotation cloudcredential.openshi
+ft.io/upgradeable-to on cloudcredential.operator.openshift.io/cluster object needs updating before upgrade. See Manually Creating I
+AM documentation for instructions on preparing a cluster for upgrade.
 
 Upstream is unset, so the cluster will use an appropriate default.
-Channel: stable-4.13 (available channels: candidate-4.13, candidate-4.14, fast-4.13, stable-4.13)
+Channel: stable-4.12 (available channels: candidate-4.12, candidate-4.13, eus-4.12, fast-4.12, stable-4.12)
 
 Recommended updates:
 
   VERSION     IMAGE
-  4.13.5      quay.io/openshift-release-dev/ocp-release@sha256:e3fb8ace9881ae5428ae7f0ac93a51e3daa71fa215b5299cd3209e134cadfc9c
+  4.13.1     quay.io/openshift-release-dev/ocp-release@sha256:db976910d909373b1136261a5479ed18ec08c93971285ff760ce75c6217d3943
 ----
 +
 [NOTE]
@@ -59,7 +61,7 @@ Recommended updates:
 Depending on when you run this command the available version list may be longer than just the next release.
 ====
 
-. You probably don't want to actually upgrade the cluster right now siince that may disrupt your lab environment. Luckily it is possible to schedule an update at a less inconvenient time.
+. You probably don't want to actually upgrade the cluster right now since that may disrupt your lab environment. Luckily it is possible to schedule an update at a less inconvenient time.
 +
 Get a date and time that is 24 hours from now:
 +
@@ -77,13 +79,13 @@ echo Date: ${UPGRADE_DATE}, Time: ${UPGRADE_TIME}
 Date: 2023-04-18, Time: 19:51
 ----
 
-. Now schedule the cluster upgrade to the latest version that is shown in the list of available versions (in the example above that is `4.13.4`) - answer `y` when prompted if you really want to upgrade.
+. Now schedule the cluster upgrade to the latest version that is shown in the list of available versions (in the example above that is `4.12.10`) - answer `y` when prompted if you really want to upgrade.
 +
 [source,sh,role=copy]
 ----
 rosa upgrade cluster \
   -c ${CLUSTER_NAME} \
-  --version 4.13.5 \
+  --version 4.13.1 \
   --mode auto \
   --schedule-date ${UPGRADE_DATE} \
   --schedule-time ${UPGRADE_TIME}
@@ -96,11 +98,35 @@ I: Ensuring account and operator role policies for cluster '235ftpmaq3oavfin8mt6
 I: Account roles/policies for cluster '235ftpmaq3oavfin8mt600af4sar9oej' are already up-to-date.
 I: Operator roles/policies associated with the cluster '235ftpmaq3oavfin8mt600af4sar9oej' are already up-to-date.
 I: Account and operator roles for cluster 'rosa-6n4s8' are compatible with upgrade
-? Are you sure you want to upgrade cluster to version '4.13.4'? Yes
+? Are you sure you want to upgrade cluster to version '4.13.1'? Yes
 I: Upgrade successfully scheduled for cluster 'rosa-6n4s8'
 ----
 
-That's it - your cluster will now be upgraded in exactly 24 hours - of course your environment will no longer exist at this time. But you now know how to easily schedule an upgrade.
+Congratulations! You've successfully scheduled an upgrade of your cluster for tomorrow at this time. While the workshop environment will be deleted before then, you now have the experience to schedule upgrades in the future.
+
+== Additional Resources
+
+=== Red Hat OpenShift Upgrade Graph Tool
+
+Occasionally, you may be not be able to go directly from your current version to a desired version. In these cases, you must first upgrade your cluster from your current version, to an intermediary version, and then to your desired version. To help you navigate these decisions, you can take advantage of the https://access.redhat.com/labs/ocpupgradegraph/update_path_rosa[Red Hat OpenShift Upgrade Graph Tool].
+
+image:../media/rosa_upgrade_graph.png[ROSA Upgrade Graph Tool Screenshot]{ align=center }
+
+In this scenario to upgrade your cluster from version 4.11.0 to 4.12.15, you must first upgrade to 4.11.39, then you can upgrade to 4.12.15. The ROSA Upgrade Graph Tool helps you easily see which version you should upgrade to.
+
+=== Links to Documentation
+
+* https://docs.openshift.com/rosa/upgrading/rosa-upgrading-sts.html[Upgrading ROSA clusters with STS]
+* https://docs.openshift.com/rosa/upgrading/rosa-upgrading-sts.html#rosa-upgrade-ocm_rosa-upgrading-sts[Scheduling individual upgrades through the OpenShift Cluster Manager console]
+* https://docs.openshift.com/container-platform/{{ rosa_version }}/updating/understanding-openshift-updates.html#update-service-about_understanding-openshift-updates[About the OpenShift Update Service]
+
+== Summary
+
+Here you learned:
+
+* All upgrades are monitored and managed by the ROSA SRE Team
+* Use OpenShift Cluster Manager (OCM) to schedule an upgrade for your ROSA cluster
+* Explore the OpenShift Upgrade Graph Tool to see available upgrade paths
 
 == Upgrade using the OpenShift Cluster Manager
 

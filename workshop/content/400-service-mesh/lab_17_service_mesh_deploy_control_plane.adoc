@@ -8,7 +8,7 @@ To learn more about the OpenShift Service Mesh, review the https://docs.openshif
 . First, let's create a project (namespace) for us to deploy the service mesh control plane into.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc new-project istio-system
 ----
@@ -30,7 +30,7 @@ to build a new example application in Ruby. Or use kubectl to deploy a simple Ku
 . Next, let's deploy the service mesh control plane.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 cat << EOF | oc apply -f -
 ---
@@ -80,7 +80,7 @@ Internal error occurred: failed calling webhook "smcp.mutation.maistra.io": fail
 . Next, let's watch the progress of the service mesh control plane rollout.
 To do so, run run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 watch oc get pods -n istio-system
 ----
@@ -106,7 +106,7 @@ Once all the pods are running (like in the example above), hit Ctrl-C and procee
 . Next, let's verify that the service mesh control plane is successfully installed.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc -n istio-system get smcp
 ----

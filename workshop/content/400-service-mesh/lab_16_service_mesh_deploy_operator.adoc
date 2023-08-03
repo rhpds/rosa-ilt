@@ -21,16 +21,16 @@ The Service Mesh Operator defines and monitors the ServiceMeshControlPlane resou
 
 . If you are not still there open the OpenShift Container Platform web console. If you need to remind yourself of the URL you can use one of the following two commands on your bastion VM:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc whoami --show-console
 ----
 +
 or
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa describe cluster -c rosa-${GUID} | grep Console
+rosa describe cluster -c ${CLUSTER_NAME} | grep Console
 ----
 
 . In the OpenShift Container Platform web console, click *Operators → OperatorHub.*

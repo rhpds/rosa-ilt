@@ -20,9 +20,9 @@ To set up the Amazon Cognito service we need to do a few things:
 
 . The first step is to create a user pool in the Amazon Cognito service.
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-aws cognito-idp create-user-pool --pool-name rosa-${GUID} --auto-verified-attributes email \
+aws cognito-idp create-user-pool --pool-name ${CLUSTER_NAME} --auto-verified-attributes email \
   --admin-create-user-config '{"AllowAdminCreateUserOnly": true}'
 ----
 +
@@ -41,7 +41,7 @@ aws cognito-idp create-user-pool --pool-name rosa-${GUID} --auto-verified-attrib
 
 . You will be using the user pool ID to identify this user pool in subsequent commands. Retrieve the user pool ID and set an environemnt variable in your terminal:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 export AWS_USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results 1 | jq -r .UserPools[0].Id)
 
@@ -56,10 +56,10 @@ us-east-2_Z91VxhckZ
 
 . Now let's create a domain for our Cognito user pool (this command does not print a result):
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws cognito-idp create-user-pool-domain \
-  --domain "rosa-${GUID}" \
+  --domain "${CLUSTER_NAME}" \
   --user-pool-id ${AWS_USER_POOL_ID}
 ----
 
@@ -67,7 +67,7 @@ aws cognito-idp create-user-pool-domain \
 +
 First let's create an admin user for our cluster:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws cognito-idp admin-create-user \
   --user-pool-id ${AWS_USER_POOL_ID} \
@@ -111,7 +111,7 @@ aws cognito-idp admin-create-user \
 
 . Now create two more users (output not shown below):
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws cognito-idp admin-create-user \
   --user-pool-id ${AWS_USER_POOL_ID} \
@@ -131,9 +131,9 @@ aws cognito-idp admin-create-user \
 . Lastly we need to determine the OAuth callback URL, which we will use to tell Amazon Cognito where it should send authentication responses.
 To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-CLUSTER_DOMAIN=$(rosa describe cluster -c rosa-${GUID} | grep "DNS" | grep -oE '\S+.openshiftapps.com')
+CLUSTER_DOMAIN=$(rosa describe cluster -c ${CLUSTER_NAME} | grep "DNS" | grep -oE '\S+.openshiftapps.com')
 
 echo "OAuth callback URL: https://oauth-openshift.apps.${CLUSTER_DOMAIN}/oauth2callback/Cognito"
 ----
@@ -150,11 +150,11 @@ Take a note of that URL - you will need it in the next section.
 +
 . Next, let's create an app client in Amazon Cognito. To do so, run the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 aws cognito-idp create-user-pool-client \
   --user-pool-id ${AWS_USER_POOL_ID} \
-  --client-name rosa-${GUID} \
+  --client-name ${CLUSTER_NAME} \
   --generate-secret \
   --supported-identity-providers COGNITO \
   --callback-urls "https://oauth-openshift.apps.${CLUSTER_DOMAIN}/oauth2callback/Cognito" \
@@ -176,7 +176,7 @@ aws cognito-idp create-user-pool-client \
 
 . Save the *ClientID* and *ClientSecret* in two environment variables:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 export AWS_USER_POOL_CLIENT_ID=$(aws cognito-idp list-user-pool-clients --user-pool-id ${AWS_USER_POOL_ID} | jq -r .UserPoolClients[0].ClientId)
 
@@ -185,7 +185,7 @@ export AWS_USER_POOL_CLIENT_SECRET=$(aws cognito-idp describe-user-pool-client -
 
 . Double check the variables contain the same values as the command output from when you created the user pool client:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 echo -e "Client ID: ${AWS_USER_POOL_CLIENT_ID}\nClient Secret: ${AWS_USER_POOL_CLIENT_SECRET}"
 ----
@@ -203,10 +203,10 @@ Now that you have your Cognito service fully configured you can configure the Op
 
 . Set up the identity provider in OpenShift:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 rosa create idp \
---cluster rosa-${GUID} \
+--cluster ${CLUSTER_NAME} \
 --type openid \
 --name Cognito \
 --client-id ${AWS_USER_POOL_CLIENT_ID} \
@@ -231,7 +231,7 @@ I: To log in to the console, open https://console-openshift-console.apps.rosa-6n
 +
 . Validate that the cluster's `OAuth` resource has been updated (this may take several minutes to update):
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get oauth cluster -o json | jq .spec.identityProviders
 ----
@@ -283,7 +283,7 @@ You will notice that there are two authentication providers configured: Cognito 
 
 . To display just the names of the configured identity providers use this command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get oauth cluster -o json | jq -r '.spec.identityProviders[].name'
 ----
@@ -297,7 +297,7 @@ htpasswd
 
 . It will take a few minutes for the authentication operator to redeploy the authentication pods. Watch the pods until all three pods have been updated - when all three pods are running again (with an age of less than a few minutes) hit `Ctrl-C` to stop the watch:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 watch oc get pod -n openshift-authentication
 ----
@@ -313,7 +313,7 @@ oauth-openshift-7766df68c8-5zdnc   1/1     Running   0    	30s
 oauth-openshift-7766df68c8-bj777   1/1     Running   0    	58s
 ----
 
-. Logout from your OpenShift Web Console and browse back to the Console URL (`rosa describe cluster -c rosa-${GUID} -o json | jq -r '.console.url'` if you have forgotten it) and you should see a new option to login called *Cognito*.
+. Logout from your OpenShift Web Console and browse back to the Console URL (`rosa describe cluster -c ${CLUSTER_NAME} -o json | jq -r '.console.url'` if you have forgotten it) and you should see a new option to login called *Cognito*.
 +
 [TIP]
 ====
@@ -327,7 +327,7 @@ Select that, and log in using your workshop AWS credentials.
 +
 Find out the existing users in OpenShift (note for this to work you *must* have logged in via the web console before - OpenShift does not create user objects until a user has logged in).
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get users
 ----
@@ -344,21 +344,21 @@ cluster-admin             301ada8a-3348-465f-8506-31e1c6ae0db1                  
 In the example above you can see the two admin users that we have created: the `cluster-admin` which is managed by htpasswd and the `admin` user that is managed by Cognito. You will also see the `backplane-cluster-admin` that Red Hat SREs are using.
 . Save your admin user password in a variable:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 export COGNITO_ADMIN_PASSWORD=%rosa_user_password%-2@23
 ----
 
 . Save the variable to your `.bashrc`
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 echo "export COGNITO_ADMIN_PASSWORD=${COGNITO_ADMIN_PASSWORD}" >>$HOME/.bashrc
 ----
 
 . Now you can map your new Cognito `admin` user to the `cluster-admin` role by running the following command:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc adm policy add-cluster-role-to-user cluster-admin admin
 ----
@@ -394,9 +394,9 @@ Using project "default".
 
 . The final step is to delete the temporary ROSA admin user:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
-rosa delete admin -c rosa-${GUID} -y
+rosa delete admin -c ${CLUSTER_NAME} -y
 ----
 +
 .Sample Output
@@ -407,7 +407,7 @@ I: Admin user 'cluster-admin' has been deleted from cluster 'rosa-s8j4w'
 
 . Validate that only the Cognito authentication provider is left in the OpenShift OAuth configuration:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc get oauth cluster -o json | jq -r '.spec.identityProviders[].name'
 ----
@@ -422,7 +422,7 @@ Now all of your users are managed in Amazon Cognito.
 
 . You can delete the `cluster-admin` user object and it's associated identity:
 +
-[source,sh,role=execute]
+[source,sh,role=copy]
 ----
 oc delete user cluster-admin
 oc delete identity htpasswd:cluster-admin

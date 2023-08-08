@@ -305,11 +305,10 @@ Return to your OpenShift Web Console.
 
 [NOTE]
 ====
-Reminder that you can get the URL and adming password by running the following commands:
+Reminder that you can get the URLby running the following command:
 [source,sh,role=copy]
 ----
 oc whoami --show-console
-echo $COGNITO_ADMIN_PASSWORD
 ----
 ====
 

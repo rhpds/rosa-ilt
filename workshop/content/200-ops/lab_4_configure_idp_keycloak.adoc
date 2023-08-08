@@ -506,26 +506,21 @@ clusterrole.rbac.authorization.k8s.io/cluster-admin added: "rosa-admin"
 ----
 
 . Refresh the OpenShift web console - you should now be able to switch to the Administrator view.
-. Get the login command for your new user:
-.. Click on *Cluster Administrator* (your user) on the top left of the console
-.. Click on *Copy Login Command*
-.. Click on *RosaKeycloak*
-.. Click *Display Token*
-.. Copy the command under *Login with this token* to your terminal and log in:
+. Log into the API using the new user:
 +
 [source,sh,role=copy]
 ----
-oc login --token=sha256~SFmUwJmNuH9GY2sO47aRggBJsfb2VYskD_kb0VizoQc --server=https://api.rosa-s8j4w.g5r0.p1.openshiftapps.com:6443
+oc login -u rosa-admin -p RosaIsGre@t $API_URL
 ----
 +
 .Sample Output
 [source,text,options=nowrap]
 ----
-Logged into "https://api.rosa-s8j4w.g5r0.p1.openshiftapps.com:6443" as "rosa-admin" using the token provided.
+Login successful.
 
-You have access to 101 projects, the list has been suppressed. You can list all projects with 'oc projects'
+You have access to 102 projects, the list has been suppressed. You can list all projects with 'oc projects'
 
-Using project "default".
+Using project "keycloak".
 ----
 
 . The final step is to delete the temporary ROSA admin user:

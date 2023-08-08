@@ -69,7 +69,7 @@ modules:
   200-ops/lab_x_configure_vpn_access_to_privatelink:
     name: Configure VPN Access to a PrivateLink ROSA cluster
     exit_sign: Exit
-  200-ops/200-ops/lab_x_configure_idp_cognito:
+  200-ops/lab_x_configure_idp_cognito:
     name: Configure Cluster Authentication Using Amazon Cognito
     exit_sign: Exit
   200-ops/lab_x_configure_efs_csi_driver:

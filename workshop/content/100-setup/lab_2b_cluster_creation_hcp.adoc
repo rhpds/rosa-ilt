@@ -189,7 +189,7 @@ rosa create cluster \
   --oidc-config-id ${OIDC_ID} \
   --sts \
   --mode auto \
-  --yes \
+  --yes
 ----
 +
 In about 10 minutes the control plane and API will be up, and about 5-10 minutes after, the worker nodes will be up and the cluster will be completely usable.  This cluster will have a control plane across three AWS availability zones in your selected region, in a Red Hat AWS account and will also create 2 worker nodes in your AWS account.

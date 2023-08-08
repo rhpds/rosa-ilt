@@ -245,7 +245,7 @@ spec:
     serviceAccountsEnabled: true
     loginTheme: rh-sso
     redirectUris:
-    - ${CALLBACK_URL_BASE}/RosaKeyCloak
+    - ${CALLBACK_URL_BASE}/RosaKeycloak
     webOrigins:
     - "/*"
     defaultClientScopes:

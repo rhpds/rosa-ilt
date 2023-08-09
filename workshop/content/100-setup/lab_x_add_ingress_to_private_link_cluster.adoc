@@ -258,33 +258,66 @@ value(s) you've just added.
 Press Enter to Continue
 ----
 
-. Open another terminal window and add this requested value to Route53
-.. Set your variables (use your specific vars from before)
+. Add this requested value to Route53. You have two options to do that: CLI or Web Console. Do only one of the following two options:
+.. CLI:
+... Set up a few environment variables:
 +
 [source,sh]
 ----
-export HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
-export DOMAIN=szrxx.sandbox2309.opentlc.com
+ACME_DOMAIN=_acme-challenge.tfbjn.sandbox1446.opentlc.com.
+ACME_CHALLENGE=a-y_au7HC9sjf96oUhArlYSe4i0geOdaUUGoLamhlco
+HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
 ----
 
-.. Create the TXT entry
+... Create json file with the information of the TXT record:
 +
 [source,sh]
 ----
-aws route53 change-resource-record-sets --hosted-zone-id ${HOSTED_ZONE_ID} 
-----
-+
-.Sample Output
-[source,texinfo]
+cat << EOF >${HOME}/acme-txt.json
+{
+  "Comment": "Add acme verification record set for this domain",
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "${ACME_DOMAIN}",
+        "Type": "TXT",
+        "TTL": 1800,
+        "ResourceRecords": [
+          {
+            "Value": "\"${ACME_CHALLENGE}\""
+          }
+        ]
+      }
+    }
+  ]
+}
+EOF
 ----
 
+... Create the record
++
+[source,sh]
 ----
+aws route53 change-resource-record-sets \
+  --hosted-zone-id ${HOSTED_ZONE_ID} \
+  --change-batch file://${HOME}/acme-txt.json
+----
+
+.. AWS Web Console
+... Open a Web Browser and point it to the AWS Web Console (%aws_web_console_url%)
+... Log in with your credentials
+.... User Name: `%aws_web_console_user_name%`
+.... Password: `%aws_web_console_password%`.
+... In Route53 add the required TXT entry to the domain that you found above.
+... Leave the AWS Console open, you will need it soon again.
+. After a few seconds return to the terminal and hit Enter. Certbot should be able to create the certificate for you.
 
 . Create TLS secret for custom domain:
 +
 [source,sh]
 ----
-CERTS=$SCRATCH_DIR/config/live/$DOMAIN
+CERTS=${SCRATCH_DIR}/config/live/${DOMAIN}
 
 oc new-project my-custom-route
 oc create secret tls acme-tls --cert=${CERTS}/fullchain.pem --key=${CERTS}/privkey.pem
@@ -295,6 +328,7 @@ oc create secret tls acme-tls --cert=${CERTS}/fullchain.pem --key=${CERTS}/privk
 [source,sh]
 ----
 cat << EOF | oc apply -f -
+---
 apiVersion: managed.openshift.io/v1alpha1
 kind: CustomDomain
 metadata:
@@ -321,10 +355,10 @@ watch oc get customdomains
 CDO_NAME=acme
 CLB_NAME=$(oc get svc -n openshift-ingress -o jsonpath='{range .items[?(@.metadata.labels.ingresscontroller\.operator\.openshift\.io\/owning-ingresscontroller=="'${CDO_NAME}'")]}{.status.loadBalancer.ingress[].hostname}{"\n"}{end}')
 
-echo $CLB_NAME
+echo ${CLB_NAME}
 ----
 
-. Create a CNAME in your DNS provider for *.<$DOMAIN> that points at the CLB NAME from the above command.
+. Back in the AWS Web Console create a CNAME in your DNS provider for `*.<$DOMAIN>` that points at the CLB NAME from the above command.
 
 == Deploy a public application
 

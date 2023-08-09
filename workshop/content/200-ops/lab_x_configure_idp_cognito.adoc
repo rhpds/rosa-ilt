@@ -18,11 +18,22 @@ To set up the Amazon Cognito service we need to do a few things:
 * Create an app client for the user pool
 * Set up the OpenShift OAuth service to use that app client
 
+. Set up your cluster name and deployment region in a few variables(make sure those match your environment):
++
+[source,sh]
+----
+export CLUSTER_NAME=rosa-hcp-${GUID}
+export REGION=eu-central-1
+----
+
 . The first step is to create a user pool in the Amazon Cognito service.
 +
 [source,sh,role=copy]
 ----
-aws cognito-idp create-user-pool --pool-name ${CLUSTER_NAME} --auto-verified-attributes email \
+aws cognito-idp create-user-pool \
+  --region ${REGION} \
+  --pool-name ${CLUSTER_NAME} \
+  --auto-verified-attributes email \
   --admin-create-user-config '{"AllowAdminCreateUserOnly": true}'
 ----
 +
@@ -31,8 +42,8 @@ aws cognito-idp create-user-pool --pool-name ${CLUSTER_NAME} --auto-verified-att
 ----
 {
     "UserPool": {
-        "Id": "us-east-2_Z91VxhckZ",
-        "Name": "rosa-6n4s8",
+        "Id": "eu-central-1_Z91VxhckZ",
+        "Name": "rosa-hcp-6n4s8",
         "Policies": {
             "PasswordPolicy": {
 
@@ -43,7 +54,7 @@ aws cognito-idp create-user-pool --pool-name ${CLUSTER_NAME} --auto-verified-att
 +
 [source,sh,role=copy]
 ----
-export AWS_USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results 1 | jq -r .UserPools[0].Id)
+export AWS_USER_POOL_ID=$(aws cognito-idp list-user-pools --region ${REGION} --max-results 1 | jq -r .UserPools[0].Id)
 
 echo ${AWS_USER_POOL_ID}
 ----
@@ -51,7 +62,7 @@ echo ${AWS_USER_POOL_ID}
 .Sample Output
 [source,text,options=nowrap]
 ----
-us-east-2_Z91VxhckZ
+eu-central-1_cFaCskJCO
 ----
 
 . Now let's create a domain for our Cognito user pool (this command does not print a result):
@@ -59,6 +70,7 @@ us-east-2_Z91VxhckZ
 [source,sh,role=copy]
 ----
 aws cognito-idp create-user-pool-domain \
+  --region ${REGION} \
   --domain "${CLUSTER_NAME}" \
   --user-pool-id ${AWS_USER_POOL_ID}
 ----
@@ -70,9 +82,10 @@ First let's create an admin user for our cluster:
 [source,sh,role=copy]
 ----
 aws cognito-idp admin-create-user \
+  --region ${REGION} \
   --user-pool-id ${AWS_USER_POOL_ID} \
   --username admin \
-  --temporary-password %rosa_user_password%-2@23 \
+  --temporary-password "Rosa1sGre@t" \
   --user-attributes Name=name,Value="Cluster Administrator" Name="email",Value="admin@rosaworkshop.com" Name="email_verified",Value="true" \
   --message-action SUPPRESS
 ----
@@ -114,21 +127,24 @@ aws cognito-idp admin-create-user \
 [source,sh,role=copy]
 ----
 aws cognito-idp admin-create-user \
+  --region ${REGION} \
   --user-pool-id ${AWS_USER_POOL_ID} \
   --username user1 \
-  --temporary-password %rosa_user_password%-2@23 \
+  --temporary-password "Rosa1sGre@t" \
   --user-attributes Name=name,Value="User 1" Name="email",Value="user1@rosaworkshop.com" Name="email_verified",Value="true" \
   --message-action SUPPRESS
 
 aws cognito-idp admin-create-user \
+  --region ${REGION} \
   --user-pool-id ${AWS_USER_POOL_ID} \
   --username user2 \
-  --temporary-password %rosa_user_password%-2@23 \
+  --temporary-password "Rosa1sGre@t" \
   --user-attributes Name=name,Value="User 2" Name="email",Value="user2@rosaworkshop.com" Name="email_verified",Value="true" \
   --message-action SUPPRESS
 ----
 
 . Lastly we need to determine the OAuth callback URL, which we will use to tell Amazon Cognito where it should send authentication responses.
++
 To do so, run the following command:
 +
 [source,sh,role=copy]
@@ -145,14 +161,13 @@ OAuth callback URL: https://oauth-openshift.apps.rosa-6sc5n.dypb.p1.openshiftapp
 ----
 +
 Take a note of that URL - you will need it in the next section.
-+
-//== Create an Amazon Cognito User Pool App Client
-+
+
 . Next, let's create an app client in Amazon Cognito. To do so, run the following command:
 +
 [source,sh,role=copy]
 ----
 aws cognito-idp create-user-pool-client \
+  --region ${REGION} \
   --user-pool-id ${AWS_USER_POOL_ID} \
   --client-name ${CLUSTER_NAME} \
   --generate-secret \
@@ -167,7 +182,7 @@ aws cognito-idp create-user-pool-client \
 [source,text,options=nowrap]
 ----
  "UserPoolClient": {
-     "UserPoolId": "us-east-2_Z91VxhckZ",
+     "UserPoolId": "eu-central-1_Z91VxhckZ",
      "ClientName": "rosa-6sc5n",
      "ClientId": "1l3onr3gg232ngprritg50fqao",
      "ClientSecret": "1tj74t43u8lf9ub45540g1mnio8sscfbr9l9o0s73a2d97s6gvhc",
@@ -178,9 +193,9 @@ aws cognito-idp create-user-pool-client \
 +
 [source,sh,role=copy]
 ----
-export AWS_USER_POOL_CLIENT_ID=$(aws cognito-idp list-user-pool-clients --user-pool-id ${AWS_USER_POOL_ID} | jq -r .UserPoolClients[0].ClientId)
+export AWS_USER_POOL_CLIENT_ID=$(aws cognito-idp --region ${REGION} list-user-pool-clients --user-pool-id ${AWS_USER_POOL_ID} | jq -r .UserPoolClients[0].ClientId)
 
-export AWS_USER_POOL_CLIENT_SECRET=$(aws cognito-idp describe-user-pool-client --user-pool-id ${AWS_USER_POOL_ID} --client-id ${AWS_USER_POOL_CLIENT_ID} | jq -r .UserPoolClient.ClientSecret)
+export AWS_USER_POOL_CLIENT_SECRET=$(aws cognito-idp describe-user-pool-client --region ${REGION} --user-pool-id ${AWS_USER_POOL_ID} --client-id ${AWS_USER_POOL_CLIENT_ID} | jq -r .UserPoolClient.ClientSecret)
 ----
 
 . Double check the variables contain the same values as the command output from when you created the user pool client:
@@ -211,7 +226,7 @@ rosa create idp \
 --name Cognito \
 --client-id ${AWS_USER_POOL_CLIENT_ID} \
 --client-secret ${AWS_USER_POOL_CLIENT_SECRET} \
---issuer-url https://cognito-idp.$(aws configure get region).amazonaws.com/${AWS_USER_POOL_ID} \
+--issuer-url https://cognito-idp.${REGION}.amazonaws.com/${AWS_USER_POOL_ID} \
 --email-claims email \
 --name-claims name \
 --username-claims username
@@ -228,6 +243,11 @@ I: Identity Provider 'Cognito' has been created.
 I: Callback URI: https://oauth-openshift.apps.rosa-6n4s8.1c1c.p1.openshiftapps.com/oauth2callback/Cognito
 I: To log in to the console, open https://console-openshift-console.apps.rosa-6n4s8.1c1c.p1.openshiftapps.com and click on 'Cognito'.
 ----
++
+[WARNING]
+====
+The following three commands will *not* work on a cluster with Hosted Control Planes. Authentication is managed differently on HCP so the `OAuth` object is empty. Which also means that the `rosa` CLI is the only way to update authentication mechanisms. Just go to the section where you log in with the new provider.
+====
 +
 . Validate that the cluster's `OAuth` resource has been updated (this may take several minutes to update):
 +
@@ -262,7 +282,7 @@ oc get oauth cluster -o json | jq .spec.identityProviders
       "clientSecret": {
         "name": "idp-client-secret-238712vvljtshrufolh9494m2khq3lac"
       },
-      "issuer": "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_wlMPBkXKO"
+      "issuer": "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_wlMPBkXKO"
     },
     "type": "OpenID"
   },

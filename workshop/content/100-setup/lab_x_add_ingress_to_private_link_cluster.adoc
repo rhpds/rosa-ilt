@@ -1,3 +1,5 @@
+// https://developers.redhat.com/articles/2023/04/27/how-add-public-ingress-private-link-rosa-cluster#
+
 = Adding a Public Ingress endpoint to a ROSA Private-Link Cluster
 
 This is an example guide for creating a public ingress endpoint for a ROSA Private-Link cluster. Be aware of the security implications of creating a public subnet in your ROSA VPC this way.
@@ -108,9 +110,10 @@ kubernetes.io/cluster/pl-sts-xqcdt-ln6s4
 ----
 PUBLIC_SUBNET=$(aws ec2 create-subnet \
   --region ${PL_REGION} \
-  --vpc-id ${VPC_ID}
+  --vpc-id ${VPC_ID} \
   --cidr-block ${PUBLIC_CIDR} \
-  --query 'Subnet.SubnetId' --output text)
+  --query 'Subnet.SubnetId' \
+  --output text)
 
 echo ${PUBLIC_SUBNET}
 ----
@@ -129,7 +132,8 @@ aws ec2 create-tags \
   --region ${PL_REGION} \
   --resources ${PUBLIC_SUBNET} \
   --tags Key=Name,Value=${PL_CLUSTER_NAME}-public \
-  Key=${TAG},Value="shared" Key=kubernetes.io/role/elb,Value="true"
+         Key=${TAG},Value="shared" \
+         Key=kubernetes.io/role/elb,Value="true"
 ----
 +
 .Sample Output
@@ -139,6 +143,21 @@ aws ec2 create-tags \
 ----
 
 == Create a Custom Domain
+
+. Set up certbot
+.. First install pip3
++
+[source,sh]
+----
+sudo dnf -y install python3-pip
+----
+
+.. Then install certbot
++
+[source,sh]
+----
+pip install certbot
+----
 
 . Create TLS Key Pair for custom domain using certbot:
 +

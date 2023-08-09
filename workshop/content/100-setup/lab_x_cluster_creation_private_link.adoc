@@ -99,7 +99,10 @@ aws ec2 modify-vpc-attribute \
 +
 [source,sh,role=copy]
 ----
-PL_PUBLIC_SUBNET=$(aws ec2 create-subnet --region ${PL_REGION} --vpc-id ${PL_VPC_ID} --cidr-block 10.0.128.0/17 | jq -r .Subnet.SubnetId)
+PL_PUBLIC_SUBNET=$(aws ec2 create-subnet \
+  --region ${PL_REGION} \
+  --vpc-id ${PL_VPC_ID} \
+  --cidr-block 10.0.128.0/24 | jq -r .Subnet.SubnetId)
 
 echo "export PL_PUBLIC_SUBNET=${PL_PUBLIC_SUBNET}" >>${HOME}/variables
 
@@ -849,11 +852,40 @@ echo ${PL_BASE_DOMAIN}
 pl-sts-szrxx.93vg.p1.openshiftapps.com
 ----
 
-. On your bastion VM update `/etc/hosts` to point the openshift domain names to localhost. Use the DNS of your openshift cluster as described in the previous step
+. The next step you will do as `root` so the environment variables will not work.
++
+Remind yourself of the three DNS names you will need to use:
++
+[source,sh]
+----
+echo api.${PL_BASE_DOMAIN}
+echo console-openshift-console.apps.${PL_BASE_DOMAIN}
+echo oauth-openshift.apps.${PL_BASE_DOMAIN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+
+----
+
+. On your bastion VM update `/etc/hosts` to point the openshift domain names to localhost.
+. First switch to the `root` user.
+[TIP]
+====
+The password for the user %rosa_bastion_user_name% is `%rosa_user_password%`
+====
++
+[source,sh]
+----
+sudo -i
+----
+
+. Use the DNS of your openshift cluster as described in the previous step
 +
 [source,sh,role=copy]
 ----
-echo "
+sudo echo "
 127.0.0.1 api.${PL_BASE_DOMAIN}
 127.0.0.1 console-openshift-console.apps.${PL_BASE_DOMAIN}
 127.0.0.1 oauth-openshift.apps.${PL_BASE_DOMAIN}

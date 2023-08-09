@@ -164,7 +164,8 @@ pip install certbot
 +
 [source,sh,role=copy]
 ----
-aws route53 list-hosted-zones --output=json | jq '.HostedZones[] | select(.Config.PrivateZone == false)'
+aws route53 list-hosted-zones \
+  --output=json | jq '.HostedZones[] | select(.Config.PrivateZone == false)'
 ----
 +
 .Sample Output
@@ -203,13 +204,13 @@ aws route53 list-hosted-zones --output=json | jq '.HostedZones[] | select(.Confi
 +
 [NOTE]
 ====
-This command should print three hosted zones. You want to use the ID for the Hosted Zone where the name looks like `xxxxx.sandboxYYYY.opentlc.com`. In the example above that would be `szrxx.sandbox2309.opentlc.com` and therefore your HOSTED_ZONE_ID should be set to `Z01849073R81WOHBEDGNL` in the next command.
+This command should print three or more hosted zones. You want to use the ID for the Hosted Zone where the name looks like `xxxxx.sandboxYYYY.opentlc.com`. In the example above that would be `szrxx.sandbox2309.opentlc.com` and therefore your HOSTED_ZONE_ID should be set to `Z01849073R81WOHBEDGNL` in the next command.
 And the *DOMAIN* should be set to `szrxx.sandbox2309.opentlc.com`.
 ====
 
 . Export few environment variables (using values from above for the HOSTED_ZONE_ID and DOMAIN)
 +
-[source,sh,role=copy]
+[source,sh]
 ----
 export LETSENCRYPT_EMAIL=youremail@work.com
 
@@ -217,22 +218,71 @@ export HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
 export DOMAIN=szrxx.sandbox2309.opentlc.com
 ----
 
-. Create TLS key pair for custom domain using certbot:
+. Create TLS key pair for custom domain using certbot (*Do not press enter when prompted until you do the following step!!*):
 +
 [source,sh]
 ----
 certbot certonly --manual \
   --preferred-challenges=dns \
-  --email $EMAIL \
+  --email ${LETSENCRYPT_EMAIL} \
   --server https://acme-v02.api.letsencrypt.org/directory \
   --agree-tos \
-  --config-dir "$SCRATCH_DIR/config" \
-  --work-dir "$SCRATCH_DIR/work" \
-  --logs-dir "$SCRATCH_DIR/logs" \
-  -d "*.$DOMAIN"
+  --config-dir "${SCRATCH_DIR}/config" \
+  --work-dir "${SCRATCH_DIR}/work" \
+  --logs-dir "${SCRATCH_DIR}/logs" \
+  -d "*.${DOMAIN}"
+----
++
+.Sample Output
+[source,texinfo]
+----
+Requesting a certificate for *.tfbjn.sandbox1446.opentlc.com
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Please deploy a DNS TXT record under the name:
+
+_acme-challenge.tfbjn.sandbox1446.opentlc.com.
+
+with the following value:
+
+a-y_au7HC9sjf96oUhArlYSe4i0geOdaUUGoLamhlco
+
+Before continuing, verify the TXT record has been deployed. Depending on the DNS
+provider, this may take some time, from a few seconds to multiple minutes. You can
+check if it has finished deploying with aid of online tools, such as the Google
+Admin Toolbox: https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.tfbjn.sandbox1446.opentlc.com.
+Look for one or more bolded line(s) below the line ';ANSWER'. It should show the
+value(s) you've just added.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Press Enter to Continue
 ----
 
-Create TLS secret for custom domain:
+. Add this value to your Route53 Domain (in the AWS Console)
+// . Open another terminal window and add this requested value to Route53
+// .. Set your variables (use your specific vars from before)
+// +
+// [source,sh]
+// ----
+// export HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
+// export DOMAIN=szrxx.sandbox2309.opentlc.com
+// ----
+
+// .. Create the TXT entry
+// +
+// [source,sh]
+// ----
+// aws route53 change-resource-record-sets --hosted-zone-id ${HOSTED_ZONE_ID} 
+// ----
+// +
+// .Sample Output
+// [source,texinfo]
+// ----
+
+// ----
+
+
+. Create TLS secret for custom domain:
 +
 [source,sh]
 ----
@@ -253,8 +303,8 @@ metadata:
 spec:
   domain: $DOMAIN
   certificate:
-  name: acme-tls
-  namespace: my-custom-route
+    name: acme-tls
+    namespace: my-custom-route
 EOF
 ----
 

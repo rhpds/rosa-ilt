@@ -47,13 +47,13 @@ aws route53 list-hosted-zones --output=json | jq '.HostedZones[] | select(.Confi
 +
 [NOTE]
 ====
-This command should print three hosted zones. You want to use the ID for the Hosted Zone where the name looks like `xxxxx.sandboxYYYY.opentlc.com`. In the example above that would be `szrxx.sandbox2309.opentlc.com` and therefore your HOSTED_ZONE_ID should be set to `Z01849073R81WOHBEDGNL` in the next command.
+This command should print three or more hosted zones. You want to use the ID for the Hosted Zone where the name looks like `xxxxx.sandboxYYYY.opentlc.com`. In the example above that would be `szrxx.sandbox2309.opentlc.com` and therefore your HOSTED_ZONE_ID should be set to `Z01849073R81WOHBEDGNL` in the next command.
 And the *DOMAIN* should be set to `szrxx.sandbox2309.opentlc.com`.
 ====
 
 . Export few environment variables (using values from above for the HOSTED_ZONE_ID and DOMAIN)
 +
-[source,sh,role=copy]
+[source,sh]
 ----
 export OIDC_PROVIDER=$(oc get authentication.config.openshift.io cluster -o json \
 | jq -r .spec.serviceAccountIssuer| sed -e "s/^https:\/\///")

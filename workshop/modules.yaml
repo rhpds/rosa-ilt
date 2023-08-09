@@ -69,6 +69,9 @@ modules:
   200-ops/lab_x_configure_vpn_access_to_privatelink:
     name: Configure VPN Access to a PrivateLink ROSA cluster
     exit_sign: Exit
+  100-setup/lab_x_add_ingress_to_private_link_cluster:
+    name: Adding a Public Ingress endpoint to a ROSA Private-Link Cluster
+    exit_sign: Exit
   200-ops/lab_x_configure_idp_cognito:
     name: Configure Cluster Authentication Using Amazon Cognito
     exit_sign: Exit

@@ -141,72 +141,98 @@ aws ec2 create-tags \
 == Create a Custom Domain
 
 . Create TLS Key Pair for custom domain using certbot:
-
-    Skip this if you already have a key pair.
-
++
+[source,sh]
+----
 certbot certonly --manual \
-    --preferred-challenges=dns \
-    --email $EMAIL \
-    --server https://acme-v02.api.letsencrypt.org/directory \
-    --agree-tos \
-    --config-dir "$SCRATCH_DIR/config" \
-    --work-dir "$SCRATCH_DIR/work" \
-    --logs-dir "$SCRATCH_DIR/logs" \
-    -d "*.$DOMAIN"
+  --preferred-challenges=dns \
+  --email $EMAIL \
+  --server https://acme-v02.api.letsencrypt.org/directory \
+  --agree-tos \
+  --config-dir "$SCRATCH_DIR/config" \
+  --work-dir "$SCRATCH_DIR/work" \
+  --logs-dir "$SCRATCH_DIR/logs" \
+  -d "*.$DOMAIN"
+----
 
 Create TLS secret for custom domain:
-
-    Note use your own keypair paths if not using certbot.
-
++
+[source,sh]
+----
 CERTS=/tmp/scratch/config/live/$DOMAIN
 oc new-project my-custom-route
 oc create secret tls acme-tls --cert=$CERTS/fullchain.pem --key=$CERTS/privkey.pem
+----
 
-Create Custom Domain resource:
-
+. Create Custom Domain resource:
++
+[source,sh]
+----
 cat << EOF | oc apply -f -
 apiVersion: managed.openshift.io/v1alpha1
 kind: CustomDomain
 metadata:
-    name: acme
+  name: acme
 spec:
-    domain: $DOMAIN
-    certificate:
-    name: acme-tls
-    namespace: my-custom-route
+  domain: $DOMAIN
+  certificate:
+  name: acme-tls
+  namespace: my-custom-route
 EOF
+----
 
-Wait for the domain to be ready:
-
+. Wait for the domain to be ready:
++
+[source,sh]
+----
 watch oc get customdomains
+----
 
-Once its ready grab the CLB name:
-
+. Once its ready grab the CLB name:
++
+[source,sh]
+----
 CDO_NAME=acme
 CLB_NAME=$(oc get svc -n openshift-ingress -o jsonpath='{range .items[?(@.metadata.labels.ingresscontroller\.operator\.openshift\.io\/owning-ingresscontroller=="'$CDO_NAME'")]}{.status.loadBalancer.ingress[].hostname}{"\n"}{end}')
+
 echo $CLB_NAME
+----
 
-Create a CNAME in your DNS provider for *.<$DOMAIN> that points at the CLB NAME from the above command.
+. Create a CNAME in your DNS provider for *.<$DOMAIN> that points at the CLB NAME from the above command.
 
-Deploy a public application
+== Deploy a public application
 
-Create a new project
-
+. Create a new project
++
+[source,sh]
+----
 oc new-project my-public-app
+----
 
-Create a new application
-
+. Create a new application
++
+[source,sh]
+----
 oc new-app --docker-image=docker.io/openshift/hello-openshift
+----
 
-Create a route for the application
-
+. Create a route for the application
++
+[source,sh]
+----
 oc create route edge --service=hello-openshift hello-openshift-tls \
-    --hostname hello.$DOMAIN
+  --hostname hello.$DOMAIN
+----
 
-Check that you can access the application:
-
+. Check that you can access the application:
++
+[source,sh]
+----
 curl https://hello.$DOMAIN
-
-You should see the output
-
+----
++
+.Sample Output
+[source,texinfo]
+----
 Hello OpenShift!
+----

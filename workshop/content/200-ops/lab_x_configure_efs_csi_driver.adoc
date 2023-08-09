@@ -349,7 +349,7 @@ Only pick one of the following options. Either a region-wide EFS file system. Or
 [source,sh,role=copy]
 ----
 EFS=$(
-  aws efs create-file-system
+  aws efs create-file-system \
   --creation-token efs-token-1 \
   --region ${REGION} \
   --encrypted | jq -r '.FileSystemId')

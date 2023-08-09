@@ -683,6 +683,16 @@ aws ec2 authorize-security-group-ingress \
 }
 ----
 
+.. Create `~/.ssh` directory if it doesn't exist
++
+[source,sh,role=copy]
+----
+if [ ! -d "${HOME}/.ssh" ]; then
+  mkdir ${HOME}/.ssh
+  chmod 700 ${HOME}/.ssh
+fi
+----
+
 .. Create a key pair for your jumphost
 +
 [source,sh,role=copy]
@@ -864,7 +874,7 @@ sudo ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem \
 . With the SSH connection active open another terminal window to your bastion VM.
 . Log into the cluster using oc login command from the create admin command above. For example:
 +
-[source,sh,role=copy]
+[source,sh]
 ----
 oc login https://api.pl-sts-szrxx.93vg.p1.openshiftapps.com:6443 --username cluster-admin --password nBfNx-xrBrX-ewgZt-eLXDg
 ----

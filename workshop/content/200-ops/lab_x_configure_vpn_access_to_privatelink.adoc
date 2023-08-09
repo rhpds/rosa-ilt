@@ -639,6 +639,17 @@ Session name: 6504d9ec9512.cvpn-endpoint-087b2719f4d0c3e3c.prod.clientvpn.us-wes
       Status: Connection, Client connected
 ----
 
+. If you set up the Jumpbox in the lab where you configured your PrivateLink cluster you must revert the changes that you made to the `/etc/hosts` file for the routing to work.
++
+As root (`sudo -i`) remove these lines from `/etc/hosts`
++
+[source,sh]
+----
+127.0.0.1 api.${PL_BASE_DOMAIN}
+127.0.0.1 console-openshift-console.apps.${PL_BASE_DOMAIN}
+127.0.0.1 oauth-openshift.apps.${PL_BASE_DOMAIN}
+----
+
 . Now you can log into the OpenShift cluster using the `oc login` command.
 
 . To disconnect from the VPN you can run the following command:

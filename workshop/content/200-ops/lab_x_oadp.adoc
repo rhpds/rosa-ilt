@@ -412,7 +412,7 @@ curl $(oc get route/hello-openshift -n hello-world -o jsonpath='{.spec.host}')
 Hello OpenShift!
 ----
 
-. Backup workload
+. Backup workload (excluding the `ImageStreamTags` prevents errors on restore when the tags are mismatching in the `ImageStream`):
 +
 [source,sh,role=copy]
 ----
@@ -426,6 +426,8 @@ metadata:
 spec:
   includedNamespaces:
   - hello-world
+  excludedResources:
+  - imagestreamtags
   storageLocation: ${CLUSTER_NAME}-dpa-1
   ttl: 720h0m0s
 EOF

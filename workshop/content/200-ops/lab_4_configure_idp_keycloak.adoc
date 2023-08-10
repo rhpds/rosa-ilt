@@ -492,17 +492,19 @@ rosa-admin                bc530c3d-26f1-4d6f-a1a8-cf74311d9156   ROSA Admin     
 +
 In the example above you can see the two admin users that we have created: the `cluster-admin` which is managed by htpasswd and the `34b868e4-6f63-4818-86e2-d642f2ea967a` user that is managed by Red Hat SSO. You will also see the `backplane-cluster-admin` that Red Hat SREs are using.
 
-. Give your admin cluster-admin permission by running the following command:
+. Since this is ROSA you can't just use `oc adm policy` to grant `cluster-admin` permissions to your `rosa-admin` user. You have to use the `rosa` CLI instead. If you don't then you may run into issues later on where some commands are prohibited by the ROSA web hook. So use the rosa CLI:
 +
 [source,sh,role=copy]
 ----
-oc adm policy add-cluster-role-to-user cluster-admin rosa-admin
+rosa grant user cluster-admin \
+  --user=rosa-admin \
+  --cluster=${CLUSTER_NAME}
 ----
 +
 .Sample Output
 [source,text,options=nowrap]
 ----
-clusterrole.rbac.authorization.k8s.io/cluster-admin added: "rosa-admin"
+I: Granted role 'cluster-admins' to user 'rosa-admin' on cluster 'rosa-tfbjn'
 ----
 
 . Refresh the OpenShift web console - you should now be able to switch to the Administrator view.

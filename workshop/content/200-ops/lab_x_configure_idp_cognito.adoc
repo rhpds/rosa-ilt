@@ -376,17 +376,19 @@ export COGNITO_ADMIN_PASSWORD=%rosa_user_password%-2@23
 echo "export COGNITO_ADMIN_PASSWORD=${COGNITO_ADMIN_PASSWORD}" >>$HOME/.bashrc
 ----
 
-. Now you can map your new Cognito `admin` user to the `cluster-admin` role by running the following command:
+. Since this is ROSA you can't just use `oc adm policy` to grant `cluster-admin` permissions to your `rosa-admin` user. You have to use the `rosa` CLI instead. If you don't then you may run into issues later on where some commands are prohibited by the ROSA web hook. So use the rosa CLI:
 +
 [source,sh,role=copy]
 ----
-oc adm policy add-cluster-role-to-user cluster-admin admin
+rosa grant user cluster-admin \
+  --user=admin \
+  --cluster=${CLUSTER_NAME}
 ----
 +
 .Sample Output
 [source,text,options=nowrap]
 ----
-clusterrole.rbac.authorization.k8s.io/cluster-admin added: "admin"
+I: Granted role 'cluster-admins' to user 'admin' on cluster 'rosa-tfbjn'
 ----
 
 . Refresh the OpenShift web console - you should now be able to switch to the Administrator view.

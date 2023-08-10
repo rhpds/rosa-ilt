@@ -142,6 +142,39 @@ OCM Organization ID:          <redacted>
 OCM Organization Name:        Red Hat, Inc.
 ----
 
+// === Install OCM
+
+// You will need to use the OpenShift Cluster Manager (ocm) to do some tasks in these labs.
+
+// . Set the OCM Release to download (at time of writing this was `0.1.67` - you can check at https://github.com/openshift-online/ocm-cli/releases if there is anything newer available):
+// +
+// [source,sh]
+// ----
+// export OCM_RELEASE=v0.1.67
+// ----
+
+// . Download the latest OCM release
+// +
+// [source,sh]
+// ----
+// # Check that ${HOME}/bin exists
+// if [ ! -d "${HOME}/bin" ]; then
+//   mkdir ${HOME}/bin
+// fi
+
+// wget -O ${HOME}/bin/ocm https://github.com/openshift-online/ocm-cli/releases/download/${OCM_RELEASE}/ocm-linux-amd64
+
+// chmod +x ${HOME}/bin/ocm
+
+// ocm version
+// ----
+// +
+// .Sample Output
+// [source,texinfo]
+// ----
+// 0.1.67
+// ----
+
 === Verify quota
 
 . Verify that your AWS account has enough quota in the region you will be deploying your cluster to.

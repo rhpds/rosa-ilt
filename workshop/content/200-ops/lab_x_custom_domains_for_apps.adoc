@@ -239,6 +239,22 @@ NAME                                                        READY   STATUS    RE
 cert-manager-operator-controller-manager-579bcb76f8-rg77t   2/2     Running   0          41s
 ----
 
+. Wait until all cert manager pods are running
++
+[source,sh]
+----
+oc get pod -n cert-manager
+----
++
+.Sample Output
+[source,texinfo]
+----
+NAME                                       READY   STATUS    RESTARTS   AGE
+cert-manager-6885dfc5d6-2qslh              1/1     Running   0          23s
+cert-manager-cainjector-7756df6bd8-bvsxd   1/1     Running   0          59s
+cert-manager-webhook-7bbdb775dc-x28cn	   1/1     Running   0          61s
+----
+
 . Annotate the ServiceAccount. This is to enable the AWS SDK client code running within the cert-manager pod to interact with AWS STS service for temporary tokens, by assuming the IAM Role that was created in an earlier step. This is referred to as IRSA.
 +
 [source,sh,role=copy]
@@ -519,7 +535,7 @@ tcoana.appdomain.rosa-szrxx.82bk.p1.openshiftapps.com. 60 IN A 3.120.1.101
 ----
 
 == Test the custom domain
- 
+
 === Create a test an application
 
 . Create a test application in a new namespace.
@@ -664,7 +680,7 @@ oc annotate route testroute -n dynroute cert-manager.io/issuer-kind=ClusterIssue
 route.route.openshift.io/testroute created
 route.route.openshift.io/testroute annotated
 ----
-    
+
 . It will take a 2-3 minutes for the certificate to be created. The renewal of the certificate will automatically be managed by the cert-manager components as it approaches expiry.
 
 . Access the application Route. Do a curl test (or any http client of your preference) to confirm there are no certificate related errors.

@@ -6,11 +6,11 @@ When you configure a Red Hat OpenShift on AWS (ROSA) cluster with a private link
 
 Start by setting environment variables that we will use to setup the VPN connection.
 
-. If you just deployed the cluster using the private link instructions you should have a file `${HOME}/variables` with all information. Just source it:
+. If you just deployed the cluster using the private link instructions you should have a file `${HOME}/pl-vars` with all information. Just source it:
 +
 [source,sh,role=copy]
 ----
-source ${HOME}/variables
+source ${HOME}/pl-vars
 
 echo ${PL_CLUSTER_NAME}
 ----
@@ -595,14 +595,14 @@ sudo dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.
 +
 [source,sh,role=copy]
 ----
-dnf -y copr enable dsommers/openvpn3
+sudo dnf -y copr enable dsommers/openvpn3
 ----
 
 . Finally install OpenVPN3:
 +
 [source,sh,role=copy]
 ----
-dnf -y install openvpn3-client
+sudo dnf -y install openvpn3-client
 ----
 
 . Now you can start the VPN connection:
@@ -650,7 +650,12 @@ As root (`sudo -i`) remove these lines from `/etc/hosts`
 127.0.0.1 oauth-openshift.apps.${PL_BASE_DOMAIN}
 ----
 
-. Now you can log into the OpenShift cluster using the `oc login` command.
+. Now you can log into the OpenShift cluster using the `oc login` command. Remind yourself of the login command:
++
+[source,sh]
+----
+cat ${HOME}/${PL_CLUSTER_NAME}.cmd
+----
 
 . To disconnect from the VPN you can run the following command:
 +

@@ -1,0 +1,305 @@
+= Accessing a ROSA Private Link Cluster via a Jumpbox
+
+== Prerequisits
+
+* Completion of the Private Link Cluster creation lab
+
+== Create the Jumpbox
+
+. Create an additional Security Group for the jumpbox
++
+[source,sh,role=copy]
+----
+TAG_SG="${PL_CLUSTER_NAME}-jumpbox-sg"
+
+aws ec2 create-security-group \
+  --region ${PL_REGION} \
+  --group-name ${PL_CLUSTER_NAME}-jumpbox-sg \
+  --description ${PL_CLUSTER_NAME}-jumpbox-sg \
+  --vpc-id ${PL_VPC_ID} \
+  --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=$TAG_SG}]"
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "GroupId": "sg-054cc910b9a52fb93",
+    "Tags": [
+        {
+            "Key": "Name",
+            "Value": "pl-sts-szrxx-jumpbox-sg"
+        }
+    ]
+}
+----
+
+. Grab the Security Group Id generated in the previous step
++
+[source,sh,role=copy]
+----
+PL_PUBLIC_SECURITY_GROUP_ID=$(aws ec2 describe-security-groups \
+  --region ${PL_REGION} \
+  --filters "Name=tag:Name,Values=${PL_CLUSTER_NAME}-jumpbox-sg" \
+  | jq -r '.SecurityGroups[0].GroupId')
+
+echo "export PL_PUBLIC_SECURITY_GROUP_ID=${PL_PUBLIC_SECURITY_GROUP_ID}" >>${HOME}/pl-vars
+
+echo ${PL_PUBLIC_SECURITY_GROUP_ID}
+----
++
+.Sample Output
+[source,texinfo]
+----
+sg-054cc910b9a52fb93
+----
+
+. Add a rule to allow ssh into the Public Security Group
++
+[source,sh,role=copy]
+----
+aws ec2 authorize-security-group-ingress \
+  --region ${PL_REGION} \
+  --group-id ${PL_PUBLIC_SECURITY_GROUP_ID} \
+  --protocol tcp \
+  --port 22 \
+  --cidr 0.0.0.0/0
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "Return": true,
+    "SecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-0dd17410dabd06da3",
+            "GroupId": "sg-054cc910b9a52fb93",
+            "GroupOwnerId": "870651848115",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIpv4": "0.0.0.0/0"
+        }
+    ]
+}
+----
+
+. Create `~/.ssh` directory if it doesn't exist
++
+[source,sh,role=copy]
+----
+if [ ! -d "${HOME}/.ssh" ]; then
+  mkdir ${HOME}/.ssh
+  chmod 700 ${HOME}/.ssh
+fi
+----
+
+. Create a key pair for your jumpbox
++
+[source,sh,role=copy]
+----
+aws ec2 create-key-pair \
+  --region ${PL_REGION} \
+  --key-name ${PL_CLUSTER_NAME}-key \
+  --query 'KeyMaterial' \
+  --output text > ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem
+
+chmod 600 ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem
+----
+
+. Determine the AMI ID to use for your jumpbox and store it in PL_AMI_ID
++
+[source,sh,role=copy]
+----
+PL_AMI_ID=$(aws ssm get-parameters \
+  --region ${PL_REGION} \
+  --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 \
+  | jq -r .Parameters[0].Value)
+
+echo "export PL_AMI_ID=${PL_AMI_ID}" >>${HOME}/pl-vars
+
+echo ${PL_AMI_ID}
+----
++
+.Sample Output
+[source,texinfo]
+----
+ami-03c6fb82ee0612587
+----
++
+The PL_AMI_ID corresponds to Amazon Linux within the private link region.
+
+. Launch an ec2 instance for your jumpbox using the parameters defined in earlier steps:
++
+[source,sh,role=copy]
+----
+PL_TAG_VM="${PL_CLUSTER_NAME}-jumpbox-vm"
+
+echo "export PL_TAG_VM=${PL_TAG_VM}" >>${HOME}/pl-vars
+
+aws ec2 run-instances \
+  --image-id ${PL_AMI_ID} \
+  --region ${PL_REGION} \
+  --count 1 \
+  --instance-type t2.micro \
+  --key-name ${PL_CLUSTER_NAME}-key \
+  --security-group-ids ${PL_PUBLIC_SECURITY_GROUP_ID} \
+  --subnet-id ${PL_PUBLIC_SUBNET} \
+  --associate-public-ip-address \
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${PL_TAG_VM}}]"
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "Groups": [],
+    "Instances": [
+        {
+            "AmiLaunchIndex": 0,
+            "ImageId": "ami-03c6fb82ee0612587",
+            "InstanceId": "i-065d9e463ba66d9fa",
+
+[...Output Omitted...]
+
+    ],
+    "OwnerId": "870651848115",
+    "ReservationId": "r-046dc760e68896379"
+}
+----
++
+This instance will be associated with a Public IP directly.
+
+. Wait until the ec2 instance is in `Running` state, grab the Public IP associated to the instance and check the if the ssh port and:
++
+[source,sh,role=copy]
+----
+IP_jumpbox=$(aws ec2 describe-instances \
+  --region ${PL_REGION} \
+  --filters "Name=tag:Name,Values=${PL_TAG_VM}" \
+  | jq -r '.Reservations[0].Instances[0].PublicIpAddress')
+
+echo "export IP_jumpbox=${IP_jumpbox}" >>${HOME}/pl-vars
+
+echo ${IP_jumpbox}
+----
++
+.Sample Output
+[source,texinfo]
+----
+54.153.92.19
+----
+
+. Test connecting to your jumpbox
++
+[source,sh,role=copy]
+----
+ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem ec2-user@${IP_jumpbox}
+----
+
+. Log back out of your jumpbox (`Ctrl-d`)
+
+. Use the rosa describe command to retrieve the DNS domain of your cluster
++
+[source,sh,role=copy]
+----
+rosa describe cluster --cluster ${PL_CLUSTER_NAME} | grep API
+----
++
+.Sample Output
+[source,texinfo,options=nowrap]
+----
+API URL:                    https://api.pl-sts-szrxx.93vg.p1.openshiftapps.com:6443
+Console URL:                https://console-openshift-console.apps.pl-sts-szrxx.93vg.p1.openshiftapps.com
+----
+
+. Set variable `PL_BASE_DOMAIN`
++
+[source,sh,role=copy]
+----
+PL_BASE_DOMAIN=${PL_CLUSTER_NAME}.$(rosa describe cluster -c ${PL_CLUSTER_NAME} -o json | jq -r '.dns.base_domain')
+
+echo "export PL_BASE_DOMAIN=${PL_BASE_DOMAIN}" >>${HOME}/pl-vars
+echo ${PL_BASE_DOMAIN}
+----
++
+.Sample Output
+[source,texinfo,options=nowrap]
+----
+pl-sts-szrxx.93vg.p1.openshiftapps.com
+----
+
+. The next step you will do as `root` so the environment variables will not work.
++
+Remind yourself of the three DNS names you will need to use:
++
+[source,sh]
+----
+echo api.${PL_BASE_DOMAIN}
+echo console-openshift-console.apps.${PL_BASE_DOMAIN}
+echo oauth-openshift.apps.${PL_BASE_DOMAIN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+api.pl-sts-szrxx.93vg.p1.openshiftapps.com
+console-openshift-console.apps.pl-sts-szrxx.93vg.p1.openshiftapps.com
+oauth-openshift.apps.pl-sts-szrxx.93vg.p1.openshiftapps.com
+----
+
+. On your bastion VM update `/etc/hosts` to point the openshift domain names to localhost.
+. First switch to the `root` user.
+[TIP]
+====
+The password for the user %rosa_bastion_user_name% is `%rosa_user_password%`
+====
++
+[source,sh]
+----
+sudo -i
+----
+
+. Use the DNS of your openshift cluster as described in the previous step
++
+[source,sh,role=copy]
+----
+sudo echo "
+127.0.0.1 api.${PL_BASE_DOMAIN}
+127.0.0.1 console-openshift-console.apps.${PL_BASE_DOMAIN}
+127.0.0.1 oauth-openshift.apps.${PL_BASE_DOMAIN}
+" >>/etc/hosts
+----
+
+. SSH to your jumpbox instance, tunneling traffic for the appropriate hostnames.
++
+[source,sh,role=copy]
+----
+sudo ssh -i ${HOME}/.ssh/${PL_CLUSTER_NAME}-key.pem \
+  -L 6443:api.${PL_BASE_DOMAIN}:6443 \
+  -L 443:console-openshift-console.apps.${PL_BASE_DOMAIN}:443 \
+  -L 80:console-openshift-console.apps.${PL_BASE_DOMAIN}:80 \
+  ec2-user@${IP_jumpbox}
+----
+
+. With the SSH connection active open another terminal window to your bastion VM.
+. Log into the cluster using oc login command from the create admin command above. For example:
++
+[source,sh]
+----
+oc login https://api.pl-sts-szrxx.93vg.p1.openshiftapps.com:6443 --username cluster-admin --password nBfNx-xrBrX-ewgZt-eLXDg
+----
++
+This login command should use your SSH tunnel to connect to your Private Link ROSA cluster.
+
+. To validate logout of the cluster (`oc logout`), then close the SSH connection and try logging in again. It should fail:
++
+.Sample Output
+[source,texinfo]
+----
+error: dial tcp 127.0.0.1:6443: connect: connection refused - verify you have provided the correct host and port and that the server is currently running.
+----
+
+While your ssh tunnel is open in the one window you can use the oc cli normally in the other window.

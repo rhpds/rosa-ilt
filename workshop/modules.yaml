@@ -15,6 +15,7 @@ modules:
   100-setup/lab_3_create_admin_user:
     name: Create Admin User
     exit_sign: Continue
+
   200-ops/lab_4_configure_idp_keycloak:
     name: Configure Cluster Authentication using Red Hat SSO
     exit_sign: Continue
@@ -33,6 +34,7 @@ modules:
   200-ops/lab_9_cloudwatch:
     name: Log Forwarding to AWS Cloudwatch
     exit_sign: Continue
+
   300-apps/lab_10_deploy_app:
     name: Deploy an Application
     exit_sign: Continue
@@ -48,6 +50,7 @@ modules:
   300-apps/lab_14_resilient_app:
     name: Making your Application Resilient
     exit_sign: Continue
+
   400-service-mesh/lab_15_service_mesh_introduction:
     name: Introduction to OpenShift Service Mesh
     exit_sign: Continue
@@ -63,17 +66,19 @@ modules:
   400-service-mesh/lab_19_service_mesh_observe:
     name: Configure and Observe Traffic
     exit_sign: Exit
-  100-setup/lab_x_cluster_creation_private_link:
+
+  100-setup/lab_x_pl_cluster_creation:
     name: Create ROSA Cluster with PrivateLink
     exit_sign: Exit
-  200-ops/lab_x_configure_vpn_access_to_privatelink:
+  100-setup/lab_x_pl_jumpbox_access:
+    name: Configure Jumpbox Access to a PrivateLink ROSA cluster
+    exit_sign: Exit
+  100-setup/lab_x_pl_vpn_access:
     name: Configure VPN Access to a PrivateLink ROSA cluster
     exit_sign: Exit
-  100-setup/lab_x_add_ingress_to_private_link_cluster:
+
+  200-ops/lab_x_pl_add_ingress:
     name: Adding a Public Ingress endpoint to a ROSA Private-Link Cluster
-    exit_sign: Exit
-  200-ops/lab_x_configure_idp_cognito:
-    name: Configure Cluster Authentication Using Amazon Cognito
     exit_sign: Exit
   200-ops/lab_x_configure_efs_csi_driver:
     name: Configure EFS CSI Driver
@@ -87,6 +92,10 @@ modules:
   200-ops/lab_x_oadp:
     name: Backup and restore using OADP
     exit_sign: Exit
+  200-ops/lab_x_configure_idp_cognito:
+    name: Configure Cluster Authentication Using Amazon Cognito
+    exit_sign: Exit
+
   300-apps/lab_x_aws_secrets_manager:
     name: Integration with AWS Secrets Manager
     exit_sign: Exit

@@ -7,13 +7,14 @@ This is an example guide for creating a public ingress endpoint for a ROSA Priva
 .Architecture diagram showing private link with public ingress
 image::../media/private-link-ingress.png[width=100%]
 
-Refer to the blog *How to add public Ingress to a PrivateLink ROSA cluster*, to expose applications to the internet by deploying in a PrivateLink Red Hat OpenShift Service on AWS (ROSA) cluster within a truly private Virtual Private Cloud (VPC) that doesn't have an internet gateway attached to it. 
+Refer to the blog https://developers.redhat.com/articles/2023/04/27/how-add-public-ingress-private-link-rosa-cluster[How to add public Ingress to a PrivateLink ROSA cluster], to expose applications to the internet by deploying in a PrivateLink Red Hat OpenShift Service on AWS (ROSA) cluster within a truly private Virtual Private Cloud (VPC) that doesn't have an internet gateway attached to it. 
 
 Additionally, the blog details about creating CloudFront distribution for content delivery and WAF to protect web applications by filtering and monitoring HTTP traffic between a web application and the internet. Also, AWS network firewall will be used for fine-grained control over network traffic.
 
 == Prerequisites
 
 * Completion of the lab to create a Private Link cluster
+* A way to access your cluster via the `oc` CLI - either via Jumpbox, VPN or any other means
 
 == Getting Started
 

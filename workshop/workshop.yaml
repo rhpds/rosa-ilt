@@ -7,28 +7,35 @@ modules:
   - 100-setup/lab_2a_cluster_creation
   - 100-setup/lab_2b_cluster_creation_hcp
   - 100-setup/lab_3_create_admin_user
+
   - 200-ops/lab_4_configure_idp_keycloak
   - 200-ops/lab_5_cluster_upgrades
   - 200-ops/lab_6_managing_worker_nodes
   - 200-ops/lab_7_autoscaling
   - 200-ops/lab_8_labeling_nodes
   - 200-ops/lab_9_cloudwatch
+
   - 300-apps/lab_10_deploy_app
   - 300-apps/lab_11_openshift_gitops
   - 300-apps/lab_12_network_policy
   - 300-apps/lab_13_cicd
   - 300-apps/lab_14_resilient_app
+
   - 400-service-mesh/lab_15_service_mesh_introduction
   - 400-service-mesh/lab_16_service_mesh_deploy_operator
   - 400-service-mesh/lab_17_service_mesh_deploy_control_plane
   - 400-service-mesh/lab_18_service_mesh_deploy_app
   - 400-service-mesh/lab_19_service_mesh_observe
-  - 100-setup/lab_x_cluster_creation_private_link
-  - 200-ops/lab_x_configure_vpn_access_to_privatelink
-  - 100-setup/lab_x_add_ingress_to_private_link_cluster
-  - 200-ops/lab_x_configure_idp_cognito
+
+  - 100-setup/lab_x_pl_cluster_creation
+  - 100-setup/lab_x_pl_jumpbox_access
+  - 100-setup/lab_x_pl_vpn_access
+
+  - 200-ops/lab_x_pl_add_ingress
   - 200-ops/lab_x_configure_efs_csi_driver
   - 200-ops/lab_x_configure_rosa_ecr
   - 200-ops/lab_x_custom_domains_for_apps
   - 200-ops/lab_x_oadp
+  - 200-ops/lab_x_configure_idp_cognito
+
   - 300-apps/lab_x_aws_secrets_manager

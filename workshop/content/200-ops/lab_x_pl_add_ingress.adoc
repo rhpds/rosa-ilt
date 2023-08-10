@@ -1,5 +1,3 @@
-// https://developers.redhat.com/articles/2023/04/27/how-add-public-ingress-private-link-rosa-cluster#
-
 = Adding a Public Ingress endpoint to a ROSA Private-Link Cluster
 
 This is an example guide for creating a public ingress endpoint for a ROSA Private-Link cluster. Be aware of the security implications of creating a public subnet in your ROSA VPC this way.
@@ -18,7 +16,17 @@ Additionally, the blog details about creating CloudFront distribution for conten
 
 == Getting Started
 
-. Set the following environment variables, changing them to suit your cluster.
+. If you still have the file `${HOME}/pl-vars` just source it to pre-populate most values:
++
+[source,sh]
+----
+source ${HOME}/pl-vars
+
+echo ${PL_CLUSTER_NAME}
+echo ${PL_REGION}
+----
+
+. If you don't have that file just set the following environment variables, changing them to suit your cluster.
 +
 [source,sh]
 ----
@@ -27,75 +35,111 @@ export PL_CLUSTER_NAME=pl-sts-${GUID}
 
 # Make sure to use the region where you have deployed your private link cluster
 export PL_REGION=us-west-1
-
-# this should be a free CIDR inside your VPC
-export PUBLIC_CIDR=10.0.2.0/24
-
-export EMAIL=username.taken@gmail.com
-export AWS_PAGER=""
-
-export SCRATCH_DIR=${HOME}/pl-ingress
-mkdir -p $SCRATCH_DIR
 ----
 
-. Create a public subnet
-
-.. If you followed the above instructions to create the ROSA Private-Link cluster, you should already have a public subnet in your VPC and can skip to tagging the subnet
+. Regardless set a variable and create your directory to hold some of the files you will be creating:
 +
 [source,sh]
 ----
-echo ${PL_PRIVATE_SUBNET}
+export INGRESS_DIR=${HOME}/pl-ingress
+mkdir -p $INGRESS_DIR
+----
 
-export PRIVATE_SUBNET_ID=${PL_PRIVATE_SUBNET}
+// . Create a public subnet
+
+// .. If you followed the above instructions to create the ROSA Private-Link cluster, you should already have a public subnet in your VPC and can skip to tagging the subnet
+// +
+// [source,sh]
+// ----
+// echo ${PL_PRIVATE_SUBNET}
+
+// export PL_PRIVATE_SUBNET=${PL_PRIVATE_SUBNET}
+// ----
+// +
+// .Sample Output
+// [source,texinfo]
+// ----
+// subnet-036bc97fd40ac9cb8
+// ----
+// +
+// If you get a result here you can skip the next step.
+
+// .. Get the Private Subnet ID from the cluster.
+// +
+// [source,sh]
+// ----
+// export PL_PRIVATE_SUBNET=$(rosa describe cluster \
+//   --cluster ${PL_CLUSTER_NAME} -o json \
+//     | jq -r '.aws.subnet_ids[0]')
+
+// echo ${PL_PRIVATE_SUBNET}
+// ----
+
+// . Get the VPC ID from the subnet ID
+// +
+// [source,sh]
+// ----
+// export VPC_ID=$(aws ec2 describe-subnets \
+//   --region ${PL_REGION} \
+//   --subnet-ids ${PL_PRIVATE_SUBNET} \
+//   --query 'Subnets[0].VpcId' --output text)
+
+// echo ${VPC_ID}
+// ----
+// +
+// .Sample Output
+// [source,texinfo]
+// ----
+// vpc-08b931eba48b7351d
+// ----
+
+. Validate that your VPC, public and private subnet variables are defined:
++
+[source,sh]
+----
+echo ${PL_VPC_ID}
+echo ${PL_PUBLIC_SUBNET}
+echo ${PL_PRIVATE_SUBNET}
 ----
 +
 .Sample Output
 [source,texinfo]
 ----
-subnet-036bc97fd40ac9cb8
+vpc-0949fdf78bcbd1494
+subnet-0222e5552db53d94a
+subnet-0fe055983b630923c
 ----
 +
-If you get a result here you can skip the next step.
+[TIP]
+====
+If either of these variables is empty use the following commands to set the appropriate values.
 
-.. Get the Private Subnet ID from the cluster.
-+
 [source,sh]
 ----
-export PRIVATE_SUBNET_ID=$(rosa describe cluster \
+// Add instructions for public subnet
+
+export PL_PRIVATE_SUBNET=$(rosa describe cluster \
   --cluster ${PL_CLUSTER_NAME} -o json \
     | jq -r '.aws.subnet_ids[0]')
 
-echo ${PRIVATE_SUBNET_ID}
-----
-
-. Get the VPC ID from the subnet ID
-+
-[source,sh]
-----
-export VPC_ID=$(aws ec2 describe-subnets \
+export PL_VPC_ID=$(aws ec2 describe-subnets \
   --region ${PL_REGION} \
-  --subnet-ids ${PRIVATE_SUBNET_ID} \
+  --subnet-ids ${PL_PRIVATE_SUBNET} \
   --query 'Subnets[0].VpcId' --output text)
+----
 
-echo ${VPC_ID}
-----
-+
-.Sample Output
-[source,texinfo]
-----
-vpc-08b931eba48b7351d
-----
+====
 
 . Get the cluster tag from the subnet
 +
 [source,sh]
 ----
-TAG=$(aws ec2 describe-subnets \
+PL_TAG=$(aws ec2 describe-subnets \
   --region ${PL_REGION} \
-  --subnet-ids ${PRIVATE_SUBNET_ID} \
+  --subnet-ids ${PL_PRIVATE_SUBNET} \
   --query 'Subnets[0].Tags[?Value == `shared`]' | jq -r '.[0].Key')
 
-echo ${TAG}
+echo ${PL_TAG}
 ----
 +
 .Sample Output
@@ -104,43 +148,43 @@ echo ${TAG}
 kubernetes.io/cluster/pl-sts-xqcdt-ln6s4
 ----
 
-. Create a public subnet
-+
-[source,sh]
-----
-PUBLIC_SUBNET=$(aws ec2 create-subnet \
-  --region ${PL_REGION} \
-  --vpc-id ${VPC_ID} \
-  --cidr-block ${PUBLIC_CIDR} \
-  --query 'Subnet.SubnetId' \
-  --output text)
+// . Create a public subnet
+// +
+// [source,sh]
+// ----
+// PUBLIC_SUBNET=$(aws ec2 create-subnet \
+//   --region ${PL_REGION} \
+//   --vpc-id ${VPC_ID} \
+//   --cidr-block ${PUBLIC_CIDR} \
+//   --query 'Subnet.SubnetId' \
+//   --output text)
 
-echo ${PUBLIC_SUBNET}
-----
-+
-.Sample Output
-[source,texinfo]
-----
+// echo ${PUBLIC_SUBNET}
+// ----
+// +
+// .Sample Output
+// [source,texinfo]
+// ----
 
-----
+// ----
 
-. Tag the public subnet for the cluster
-+
-[source,sh]
-----
-aws ec2 create-tags \
-  --region ${PL_REGION} \
-  --resources ${PUBLIC_SUBNET} \
-  --tags Key=Name,Value=${PL_CLUSTER_NAME}-public \
-         Key=${TAG},Value="shared" \
-         Key=kubernetes.io/role/elb,Value="true"
-----
-+
-.Sample Output
-[source,texinfo]
-----
+// . Tag the public subnet for the cluster
+// +
+// [source,sh]
+// ----
+// aws ec2 create-tags \
+//   --region ${PL_REGION} \
+//   --resources ${PUBLIC_SUBNET} \
+//   --tags Key=Name,Value=${PL_CLUSTER_NAME}-public \
+//          Key=${TAG},Value="shared" \
+//          Key=kubernetes.io/role/elb,Value="true"
+// ----
+// +
+// .Sample Output
+// [source,texinfo]
+// ----
 
-----
+// ----
 
 == Create a Custom Domain
 
@@ -213,10 +257,10 @@ And the *DOMAIN* should be set to `szrxx.sandbox2309.opentlc.com`.
 +
 [source,sh]
 ----
-export LETSENCRYPT_EMAIL=youremail@work.com
+export PL_LETSENCRYPT_EMAIL=youremail@work.com
 
-export HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
-export DOMAIN=szrxx.sandbox2309.opentlc.com
+export PL_HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
+export PL_DOMAIN=szrxx.sandbox2309.opentlc.com
 ----
 
 . Create TLS key pair for custom domain using certbot (*Do not press enter when prompted until you do the following step!!*):
@@ -225,13 +269,13 @@ export DOMAIN=szrxx.sandbox2309.opentlc.com
 ----
 certbot certonly --manual \
   --preferred-challenges=dns \
-  --email ${LETSENCRYPT_EMAIL} \
+  --email ${PL_LETSENCRYPT_EMAIL} \
   --server https://acme-v02.api.letsencrypt.org/directory \
   --agree-tos \
-  --config-dir "${SCRATCH_DIR}/config" \
-  --work-dir "${SCRATCH_DIR}/work" \
-  --logs-dir "${SCRATCH_DIR}/logs" \
-  -d "*.${DOMAIN}"
+  --config-dir "${INGRESS_DIR}/certbot/config" \
+  --work-dir "${INGRESS_DIR}/certbot/work" \
+  --logs-dir "${INGRESS_DIR}/certbot/logs" \
+  -d "*.${PL_DOMAIN}"
 ----
 +
 .Sample Output
@@ -268,13 +312,15 @@ Press Enter to Continue
 ACME_DOMAIN=_acme-challenge.tfbjn.sandbox1446.opentlc.com.
 ACME_CHALLENGE=a-y_au7HC9sjf96oUhArlYSe4i0geOdaUUGoLamhlco
 HOSTED_ZONE_ID=Z01849073R81WOHBEDGNL
+
+INGRESS_DIR=${HOME}/pl-ingress
 ----
 
 ... Create json file with the information of the TXT record:
 +
 [source,sh]
 ----
-cat << EOF >${HOME}/acme-txt.json
+cat << EOF >${INGRESS_DIR}/acme-txt.json
 {
   "Comment": "Add acme verification record set for this domain",
   "Changes": [
@@ -302,7 +348,20 @@ EOF
 ----
 aws route53 change-resource-record-sets \
   --hosted-zone-id ${HOSTED_ZONE_ID} \
-  --change-batch file://${HOME}/acme-txt.json
+  --change-batch file://${INGRESS_DIR}/acme-txt.json
+----
+
+... Validate that the record has been updated (retry until it shows the challenge text)
++
+[source,sh,role=copy]
+----
+dig TXT ${ACME_DOMAIN}
+----
++
+.Sample Output
+[source,texinfo]
+----
+a-y_au7HC9sjf96oUhArlYSe4i0geOdaUUGoLamhlco
 ----
 
 .. AWS Web Console
@@ -313,15 +372,35 @@ aws route53 change-resource-record-sets \
 ... In Route53 add the required TXT entry to the domain that you found above.
 ... Leave the AWS Console open, you will need it soon again.
 . After a few seconds return to the terminal and hit Enter. Certbot should be able to create the certificate for you.
++
+.Sample Output
+[source,texinfo]
+----
+
+Successfully received certificate.
+Certificate is saved at: /home/rosa/pl-ingress/certbot/config/live/tfbjn.sandbox1446.opentlc.com/fullchain.pem
+Key is saved at:         /home/rosa/pl-ingress/certbot/config/live/tfbjn.sandbox1446.opentlc.com/privkey.pem
+This certificate expires on 2023-11-08.
+These files will be updated when the certificate renews.
+
+NEXT STEPS:
+- This certificate will not be renewed automatically. Autorenewal of --manual certificates requires the use of an authentication hook script (--manual-auth-hook) but one was not provided. To renew this certificate, repeat this same certbot command before the certificate's expiry date.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+If you like Certbot, please consider supporting our work by:
+ * Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+ * Donating to EFF:                    https://eff.org/donate-le
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+----
 
 . Create TLS secret for custom domain:
 +
 [source,sh]
 ----
-CERTS=${SCRATCH_DIR}/config/live/${DOMAIN}
+PL_CERT_DIR=${INGRESS_DIR}/certbot/config/live/${PL_DOMAIN}
 
 oc new-project my-custom-route
-oc create secret tls acme-tls --cert=${CERTS}/fullchain.pem --key=${CERTS}/privkey.pem
+oc create secret tls acme-tls --cert=${PL_CERT_DIR}/fullchain.pem --key=${PL_CERT_DIR}/privkey.pem
 ----
 
 . Create Custom Domain resource:
@@ -335,7 +414,7 @@ kind: CustomDomain
 metadata:
   name: acme
 spec:
-  domain: ${DOMAIN}
+  domain: ${PL_DOMAIN}
   certificate:
     name: acme-tls
     namespace: my-custom-route
@@ -353,13 +432,61 @@ watch oc get customdomains
 +
 [source,sh]
 ----
-CDO_NAME=acme
-CLB_NAME=$(oc get svc -n openshift-ingress -o jsonpath='{range .items[?(@.metadata.labels.ingresscontroller\.operator\.openshift\.io\/owning-ingresscontroller=="'${CDO_NAME}'")]}{.status.loadBalancer.ingress[].hostname}{"\n"}{end}')
+PL_CDO_NAME=acme
+PL_CLB_NAME=$(oc get svc -n openshift-ingress -o jsonpath='{range .items[?(@.metadata.labels.ingresscontroller\.operator\.openshift\.io\/owning-ingresscontroller=="'${PL_CDO_NAME}'")]}{.status.loadBalancer.ingress[].hostname}{"\n"}{end}')
 
-echo ${CLB_NAME}
+echo ${PL_CLB_NAME}
+----
++
+.Sample Output
+[source,texinfo]
+----
+a66e1701b352f42e2b0ab4ce3e6d41c5-1436510633.us-west-1.elb.amazonaws.com
 ----
 
 . Back in the AWS Web Console create a CNAME in your DNS provider for `*.<$DOMAIN>` that points at the CLB NAME from the above command.
++
+Or use the following command to create the Route53 CNAME record.
++
+[source,sh,role=copy]
+----
+cat <<EOF > ${INGRESS_DIR}/add_cname_record.json
+{
+"Comment":"Add custom CNAME to Custom Domain Endpoint",
+"Changes":[{
+    "Action":"CREATE",
+    "ResourceRecordSet":{
+      "Name": "*.${PL_DOMAIN}",
+    "Type":"CNAME",
+    "TTL":30,
+    "ResourceRecords":[{
+      "Value": "${PL_CLB_NAME}"
+    }]
+  }
+}]
+}
+EOF
+
+aws route53 change-resource-record-sets --hosted-zone-id ${PL_HOSTED_ZONE_ID} --change-batch file://${INGRESS_DIR}/add_cname_record.json
+----
++
+.Sample Output
+[source,texinfo]
+----
+{
+    "ChangeInfo": {
+        "Id": "/change/C065165618HRI13T0A6TQ",
+        "Status": "PENDING",
+        "SubmittedAt": "2023-07-26T15:08:04.368000+00:00",
+        "Comment": "Add apps CNAME to Custom Domain Endpoint"
+    }
+}
+----
++
+[NOTE]
+====
+The wild card CNAMEing avoids the need to create a new record for every new application. The certificate that each of these applications use will NOT be a wildcard certificate.
+====
 
 == Deploy a public application
 
@@ -374,7 +501,7 @@ oc new-project my-public-app
 +
 [source,sh]
 ----
-oc new-app --docker-image=docker.io/openshift/hello-openshift
+oc new-app --image=docker.io/openshift/hello-openshift
 ----
 
 . Create a route for the application
@@ -382,14 +509,14 @@ oc new-app --docker-image=docker.io/openshift/hello-openshift
 [source,sh]
 ----
 oc create route edge --service=hello-openshift hello-openshift-tls \
-  --hostname hello.$DOMAIN
+  --hostname hello.${PL_DOMAIN}
 ----
 
 . Check that you can access the application:
 +
 [source,sh]
 ----
-curl https://hello.$DOMAIN
+curl https://hello.${PL_DOMAIN}
 ----
 +
 .Sample Output

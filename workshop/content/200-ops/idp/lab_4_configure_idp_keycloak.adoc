@@ -164,7 +164,7 @@ true
 
 === Retrieve Information about your Red Hat SSO Installation
 
-.Set some Environment Variables:
+. Set some Environment Variables:
 +
 [source,sh,role=copy]
 ----
@@ -177,14 +177,15 @@ export SSO_ADMIN_PASSWORD=$(oc -n ${SSO_NAMESPACE} -c keycloak exec -it keycloak
 export CLUSTER_DOMAIN=$(rosa describe cluster -c ${CLUSTER_NAME} | grep "DNS" | grep -oE '\S+.openshiftapps.com')
 ----
 
-. If your cluster is a regular cluster (not using hosted control planes) run this command:
+. Set your OAuth Callback URL base variable. Note that this is different for clusters using hosted control planes.
+.. For regular clusters use the following command:
 +
 [source,sh]
 ----
 export CALLBACK_URL_BASE=https://oauth-openshift.apps.${CLUSTER_DOMAIN}/oauth2callback
 ----
 
-. If your cluster is using hosted control planes run the this command instead:
+.. For clusters using hosted control planes use the following command:
 +
 [source,sh]
 ----

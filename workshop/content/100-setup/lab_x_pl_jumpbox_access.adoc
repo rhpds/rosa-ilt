@@ -252,6 +252,7 @@ oauth-openshift.apps.pl-sts-szrxx.93vg.p1.openshiftapps.com
 
 . On your bastion VM update `/etc/hosts` to point the openshift domain names to localhost.
 . First switch to the `root` user.
++
 [TIP]
 ====
 The password for the user %rosa_bastion_user_name% is `%rosa_user_password%`

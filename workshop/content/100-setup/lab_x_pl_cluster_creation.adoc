@@ -615,12 +615,14 @@ INFO: To login, run the following command:
 
    oc login https://api.pl-sts-tfbjn.ulvs.p1.openshiftapps.com:6443 --username cluster-admin --password Cbjyz-DWKc8-ov9nf-pJnVV
 
-INFO: It may take several minutes for this access to become active.----
+INFO: It may take several minutes for this access to become active.
+----
 +
 [TIP]
 ====
 The command above also saves the login command to the `$HOME/${CLUSTER_NAME}.cmd` file for future reference.
-
+====
++
 [WARNING]
 ====
 You can not use that user to log into your cluster yet - you do not have a way to connect to your cluster...

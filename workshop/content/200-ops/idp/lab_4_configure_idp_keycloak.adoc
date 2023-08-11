@@ -180,14 +180,14 @@ export CLUSTER_DOMAIN=$(rosa describe cluster -c ${CLUSTER_NAME} | grep "DNS" | 
 . Set your OAuth Callback URL base variable. Note that this is different for clusters using hosted control planes.
 .. For regular clusters use the following command:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export CALLBACK_URL_BASE=https://oauth-openshift.apps.${CLUSTER_DOMAIN}/oauth2callback
 ----
 
 .. For clusters using hosted control planes use the following command:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export CALLBACK_URL_BASE=https://oauth.${CLUSTER_DOMAIN}/oauth2callback
 ----

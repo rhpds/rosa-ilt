@@ -86,7 +86,7 @@ https://kiali-istio-system.apps.rosa-6n4s8.1c1c.p1.openshiftapps.com/console
 ====
 If you forgot the password for your `cluster-admin` user use the following command to remind yourself:
 
-[source,sh]
+[source,sh,role=copy]
 ----
 history | grep login
 ----

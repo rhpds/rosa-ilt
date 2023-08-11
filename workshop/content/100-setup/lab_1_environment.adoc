@@ -148,14 +148,14 @@ OCM Organization Name:        Red Hat, Inc.
 
 // . Set the OCM Release to download (at time of writing this was `0.1.67` - you can check at https://github.com/openshift-online/ocm-cli/releases if there is anything newer available):
 // +
-// [source,sh]
+// [source,sh,role=copy]
 // ----
 // export OCM_RELEASE=v0.1.67
 // ----
 
 // . Download the latest OCM release
 // +
-// [source,sh]
+// [source,sh,role=copy]
 // ----
 // # Check that ${HOME}/bin exists
 // if [ ! -d "${HOME}/bin" ]; then

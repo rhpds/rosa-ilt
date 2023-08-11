@@ -235,7 +235,7 @@ pl-sts-szrxx.93vg.p1.openshiftapps.com
 +
 Remind yourself of the three DNS names you will need to use:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 echo api.${PL_BASE_DOMAIN}
 echo console-openshift-console.apps.${PL_BASE_DOMAIN}
@@ -258,7 +258,7 @@ oauth-openshift.apps.pl-sts-szrxx.93vg.p1.openshiftapps.com
 The password for the user %rosa_bastion_user_name% is `%rosa_user_password%`
 ====
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 sudo -i
 ----

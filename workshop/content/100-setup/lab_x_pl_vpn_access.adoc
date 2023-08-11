@@ -643,7 +643,7 @@ Session name: 6504d9ec9512.cvpn-endpoint-087b2719f4d0c3e3c.prod.clientvpn.us-wes
 +
 As root (`sudo -i`) remove these lines from `/etc/hosts`
 +
-[source,sh]
+[source]
 ----
 127.0.0.1 api.${PL_BASE_DOMAIN}
 127.0.0.1 console-openshift-console.apps.${PL_BASE_DOMAIN}
@@ -652,7 +652,7 @@ As root (`sudo -i`) remove these lines from `/etc/hosts`
 
 . Now you can log into the OpenShift cluster using the `oc login` command. Remind yourself of the login command:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 cat ${HOME}/${PL_CLUSTER_NAME}.cmd
 ----

@@ -20,7 +20,7 @@ To set up the Amazon Cognito service we need to do a few things:
 
 . Set up your cluster name and deployment region in a few variables(make sure those match your environment):
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export CLUSTER_NAME=rosa-hcp-${GUID}
 export REGION=eu-central-1
@@ -163,14 +163,14 @@ Cluster Domain: rosa-6sc5n.dypb.p1.openshiftapps.com
 . Set your OAuth Callback URL. Note that this is different for clusters using hosted control planes.
 .. For regular clusters use the following command:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export OAUTH_CALLBACK=https://oauth-openshift.apps.${CLUSTER_DOMAIN}/oauth2callback/Cognito
 ----
 
 .. For clusters using hosted control planes use the following command:
 +
-[source,sh]
+[source,sh,role=copy]
 ----
 export OAUTH_CALLBACK=https://oauth.${CLUSTER_DOMAIN}/oauth2callback/Cognito
 ----

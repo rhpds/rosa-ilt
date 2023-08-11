@@ -8,7 +8,7 @@ modules:
   - 100-setup/lab_2b_cluster_creation_hcp
   - 100-setup/lab_3_create_admin_user
 
-  - 200-ops/lab_4_configure_idp_keycloak
+  - 200-ops/idp/lab_4_configure_idp_keycloak
   - 200-ops/lab_5_cluster_upgrades
   - 200-ops/lab_6_managing_worker_nodes
   - 200-ops/lab_7_autoscaling
@@ -36,6 +36,6 @@ modules:
   - 200-ops/lab_x_configure_rosa_ecr
   - 200-ops/lab_x_custom_domains_for_apps
   - 200-ops/lab_x_oadp
-  - 200-ops/lab_x_configure_idp_cognito
+  - 200-ops/idp/lab_x_configure_idp_cognito
 
   - 300-apps/lab_x_aws_secrets_manager

@@ -16,7 +16,7 @@ modules:
     name: Create Admin User
     exit_sign: Continue
 
-  200-ops/lab_4_configure_idp_keycloak:
+  200-ops/idp/lab_4_configure_idp_keycloak:
     name: Configure Cluster Authentication using Red Hat SSO
     exit_sign: Continue
   200-ops/lab_5_cluster_upgrades:
@@ -92,7 +92,7 @@ modules:
   200-ops/lab_x_oadp:
     name: Backup and restore using OADP
     exit_sign: Exit
-  200-ops/lab_x_configure_idp_cognito:
+  200-ops/idp/lab_x_configure_idp_cognito:
     name: Configure Cluster Authentication Using Amazon Cognito
     exit_sign: Exit
 

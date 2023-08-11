@@ -164,11 +164,8 @@ true
 
 === Retrieve Information about your Red Hat SSO Installation
 
-[IMPORTANT]
-====
-This step sets environment variables based on the installation that are needed in future steps.
-====
-
+.Set some Environment Variables:
++
 [source,sh,role=copy]
 ----
 export SSO_ADMIN_CONSOLE=https://$(oc -n ${SSO_NAMESPACE} get route keycloak -o json | jq -r '.status.ingress[0].host')
@@ -178,7 +175,20 @@ export SSO_ADMIN_USERNAME=$(oc -n ${SSO_NAMESPACE} -c keycloak exec -it keycloak
 export SSO_ADMIN_PASSWORD=$(oc -n ${SSO_NAMESPACE} -c keycloak exec -it keycloak-0 -- printenv SSO_ADMIN_PASSWORD)
 
 export CLUSTER_DOMAIN=$(rosa describe cluster -c ${CLUSTER_NAME} | grep "DNS" | grep -oE '\S+.openshiftapps.com')
+----
+
+. If your cluster is a regular cluster (not using hosted control planes) run this command:
++
+[source,sh]
+----
 export CALLBACK_URL_BASE=https://oauth-openshift.apps.${CLUSTER_DOMAIN}/oauth2callback
+----
+
+. If your cluster is using hosted control planes run the this command instead:
++
+[source,sh]
+----
+export CALLBACK_URL_BASE=https://oauth.${CLUSTER_DOMAIN}/oauth2callback
 ----
 
 === Configure Red Hat SSO
@@ -378,6 +388,11 @@ I: Identity Provider 'RosaKeycloak' has been created.
 I: Callback URI: https://oauth-openshift.apps.rosa-9zlx8.999y.p1.openshiftapps.com/oauth2callback/RosaKeycloak
 I: To log in to the console, open https://console-openshift-console.apps.rosa-9zlx8.999y.p1.openshiftapps.com and click on 'RosaKeycloak'.
 ----
++
+[WARNING]
+====
+The following three commands will *not* work on a cluster with Hosted Control Planes. Authentication is managed differently on HCP so the `OAuth` object is empty. Which also means that the `rosa` CLI is the only way to update authentication mechanisms. Just go to the section where you log in with the new provider.
+====
 
 . Validate that the cluster's `OAuth` resource has been updated (you may need to retry this command a few times until ROSA has updated the configuration):
 +
@@ -462,6 +477,8 @@ oauth-openshift-7766df68c8-5dj95   1/1     Running   0    	84s
 oauth-openshift-7766df68c8-5zdnc   1/1     Running   0    	30s
 oauth-openshift-7766df68c8-bj777   1/1     Running   0    	58s
 ----
+
+=== Log in with Red Hat SSO
 
 . Logout from your OpenShift Web Console and browse back to the Console URL (`rosa describe cluster -c ${CLUSTER_NAME} -o json | jq -r '.console.url'` if you have forgotten it) and you should see a new option to login called *RosaKeycloak*.
 +

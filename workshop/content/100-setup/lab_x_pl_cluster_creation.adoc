@@ -46,7 +46,7 @@ For this scenario, we will be using a newly created VPC with both public and pri
 ----
 PL_CLUSTER_NAME=pl-sts-${GUID}
 PL_REGION=us-west-1 # Make sure to use a region where you haven't deployed a cluster yet
-PL_VERSION=4.13.4
+PL_VERSION=4.13.10
 
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 AWS_PAGER=""

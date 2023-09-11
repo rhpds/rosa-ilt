@@ -113,7 +113,7 @@ Note that for the cluster name you are using `rosa-${GUID}` - the environment va
 [source,sh,role=copy]
 ----
 export REGION=us-east-2
-export OCP_VERSION=4.13.4
+export OCP_VERSION=4.13.10
 export CLUSTER_NAME=rosa-${GUID}
 
 echo "export REGION=${REGION}" >>${HOME}/.bashrc

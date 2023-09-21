@@ -51,7 +51,7 @@ rosa version
 .Sample Output
 [source,texinfo]
 ----
-1.2.24
+1.2.26
 I: Your ROSA CLI is up to date.
 ----
 
@@ -65,7 +65,7 @@ aws --version
 .Sample Output
 [source,text,options=nowrap]
 ----
-aws-cli/2.13.6 Python/3.11.4 Linux/5.14.0-284.25.1.el9_2.x86_64 exe/x86_64.rhel.9 prompt/off
+aws-cli/2.13.20 Python/3.11.5 Linux/5.14.0-284.30.1.el9_2.x86_64 exe/x86_64.rhel.9 prompt/off
 ----
 
 . Verify that the `aws` command line tool is configured correctly:
@@ -96,7 +96,7 @@ rosa verify openshift-client
 [source,texinfo,options=nowrap]
 ----
 I: Verifying whether OpenShift command-line tool is available...
-I: Current OpenShift Client Version: 4.13.6
+I: Current OpenShift Client Version: 4.13.13
 ----
 
 . Rosa login
